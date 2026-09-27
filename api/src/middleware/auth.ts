@@ -1,9 +1,9 @@
 import type { MiddlewareHandler } from "hono";
 import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { members } from "../db/schema";
-import { readToken } from "../lib/auth";
-import { forbidden, unauthorized } from "../lib/errors";
+import { db } from "../db/index.js";
+import { members } from "../db/schema.js";
+import { readToken } from "../lib/auth.js";
+import { forbidden, unauthorized } from "../lib/errors.js";
 
 export interface AuthUser {
   id: number;

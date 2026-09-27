@@ -1,5 +1,5 @@
 import type { Config } from "drizzle-kit";
-import { env } from "./src/env";
+import { env } from "./src/env.js";
 
 /** 權威 DDL 是 sql/0000_init.sql（含 check 約束與 RLS）。此設定僅供 drizzle-kit studio / 檢查漂移。 */
 export default {

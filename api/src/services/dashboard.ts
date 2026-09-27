@@ -1,10 +1,10 @@
 import { and, desc, eq, gte, lt } from "drizzle-orm";
 import type { CategoryProgress, DashboardPayload, MonthSummary } from "@family-ledger/shared";
-import { db } from "../db";
-import { budgets, transactions } from "../db/schema";
-import { existsInMonth, monthRange } from "../lib/dates";
-import { listCategories } from "./categories";
-import { fixedTotal } from "./fixed";
+import { db } from "../db/index.js";
+import { budgets, transactions } from "../db/schema.js";
+import { existsInMonth, monthRange } from "../lib/dates.js";
+import { listCategories } from "./categories.js";
+import { fixedTotal } from "./fixed.js";
 import {
   intSum,
   notFuture,
@@ -12,7 +12,7 @@ import {
   recentByCategory,
   toView,
   transactionViewQuery,
-} from "./views";
+} from "./views.js";
 
 const RECENT_PER_CATEGORY = 3;
 const RECENT_OVERALL = 8;

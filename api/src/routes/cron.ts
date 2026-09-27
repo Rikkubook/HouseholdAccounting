@@ -1,9 +1,9 @@
 import { Hono } from "hono";
-import { runDueCharges } from "../services/charges";
-import { runBackup } from "../services/backup";
-import { env } from "../env";
-import { today } from "../lib/dates";
-import type { AppEnv } from "../middleware/auth";
+import { runDueCharges } from "../services/charges.js";
+import { runBackup } from "../services/backup.js";
+import { env } from "../env.js";
+import { today } from "../lib/dates.js";
+import type { AppEnv } from "../middleware/auth.js";
 
 /**
  * Vercel Cron 專用路由。serverless 沒有常駐 process，排程由平台定時打這支

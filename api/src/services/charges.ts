@@ -1,7 +1,7 @@
 import { and, eq, isNotNull, lte } from "drizzle-orm";
-import { db } from "../db";
-import { mainCategories, subscriptions, transactions } from "../db/schema";
-import { advanceChargeDate, today } from "../lib/dates";
+import { db } from "../db/index.js";
+import { mainCategories, subscriptions, transactions } from "../db/schema.js";
+import { advanceChargeDate, today } from "../lib/dates.js";
 
 export type ChargeResult = { subscriptionId: number; name: string; amount: number; date: string; transactionId: number };
 

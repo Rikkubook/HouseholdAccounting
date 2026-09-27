@@ -10,19 +10,19 @@ import {
   type Subscription,
   type SubscriptionRevision,
 } from "@family-ledger/shared";
-import { db } from "../db";
+import { db } from "../db/index.js";
 import {
   mainCategories,
   members,
   subscriptionRevisions,
   subscriptions,
   transactions,
-} from "../db/schema";
-import { badRequest, notFound } from "../lib/errors";
-import { currentMonth, monthOf } from "../lib/dates";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth";
-import { findView } from "../services/views";
-import { chargeOnce } from "../services/charges";
+} from "../db/schema.js";
+import { badRequest, notFound } from "../lib/errors.js";
+import { currentMonth, monthOf } from "../lib/dates.js";
+import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { findView } from "../services/views.js";
+import { chargeOnce } from "../services/charges.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 

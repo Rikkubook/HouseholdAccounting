@@ -10,12 +10,12 @@ import {
   queryBoolSchema,
   subNameSchema,
 } from "@family-ledger/shared";
-import { db } from "../db";
-import { mainCategories, subCategories } from "../db/schema";
-import { badRequest, conflict, notFound } from "../lib/errors";
-import { currentMonth } from "../lib/dates";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth";
-import { findCategory, listCategories } from "../services/categories";
+import { db } from "../db/index.js";
+import { mainCategories, subCategories } from "../db/schema.js";
+import { badRequest, conflict, notFound } from "../lib/errors.js";
+import { currentMonth } from "../lib/dates.js";
+import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { findCategory, listCategories } from "../services/categories.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 const subIdParam = zValidator("param", z.object({ subId: idSchema }));

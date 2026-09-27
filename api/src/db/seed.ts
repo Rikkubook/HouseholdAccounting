@@ -1,4 +1,4 @@
-import { db, sql } from "./index";
+import { db, sql } from "./index.js";
 import {
   budgets,
   mainCategories,
@@ -8,10 +8,10 @@ import {
   subscriptions,
   transactions,
   yearExtraExpenses,
-} from "./schema";
-import { hashPassword } from "../lib/auth";
-import { env } from "../env";
-import { monthOf } from "../lib/dates";
+} from "./schema.js";
+import { hashPassword } from "../lib/auth.js";
+import { env } from "../env.js";
+import { monthOf } from "../lib/dates.js";
 
 /**
  * 由 vue3/src/mocks/data.ts 逐筆轉出，讓真後端接上後畫面與 mock 一致。

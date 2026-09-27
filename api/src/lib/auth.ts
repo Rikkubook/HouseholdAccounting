@@ -1,7 +1,7 @@
 import { hash, verify } from "@node-rs/argon2";
 import { SignJWT, jwtVerify } from "jose";
 import { randomInt } from "node:crypto";
-import { env } from "../env";
+import { env } from "../env.js";
 
 const secret = new TextEncoder().encode(env.JWT_SECRET);
 

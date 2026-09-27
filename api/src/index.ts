@@ -1,6 +1,6 @@
 import { serve } from "@hono/node-server";
-import { app } from "./app";
-import { env } from "./env";
+import { app } from "./app.js";
+import { env } from "./env.js";
 
 /**
  * postgres.js 在查詢被取消（如 statement timeout）時，偶爾會在該查詢的 promise
@@ -19,4 +19,4 @@ serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log("API listening on http://localhost:" + info.port + "/api");
 });
 
-export type { AppType } from "./app";
+export type { AppType } from "./app.js";

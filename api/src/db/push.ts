@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import postgres from "postgres";
-import { env } from "../env";
+import { env } from "../env.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 

@@ -9,13 +9,13 @@ import {
   setActiveSchema,
   type Member,
 } from "@family-ledger/shared";
-import { db } from "../db";
-import { members, subscriptions } from "../db/schema";
-import { generateResetCode } from "../lib/auth";
-import { conflict, notFound } from "../lib/errors";
-import { currentMonth } from "../lib/dates";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth";
-import type { MemberRow } from "../db/schema";
+import { db } from "../db/index.js";
+import { members, subscriptions } from "../db/schema.js";
+import { generateResetCode } from "../lib/auth.js";
+import { conflict, notFound } from "../lib/errors.js";
+import { currentMonth } from "../lib/dates.js";
+import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import type { MemberRow } from "../db/schema.js";
 
 /** passwordHash 與登入失敗計數永不外流。resetCode 明文回傳，供管理者轉達給成員。 */
 export const toMember = (row: MemberRow): Member => ({

@@ -1,11 +1,11 @@
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { StatsPayload, StatsRow } from "@family-ledger/shared";
-import { db } from "../db";
-import { budgets, transactions } from "../db/schema";
-import { addMonths, existsInMonth, monthRange, yearRange } from "../lib/dates";
-import { listCategories } from "./categories";
-import { effectiveSubscriptions } from "./fixed";
-import { intSum, notFuture } from "./views";
+import { db } from "../db/index.js";
+import { budgets, transactions } from "../db/schema.js";
+import { addMonths, existsInMonth, monthRange, yearRange } from "../lib/dates.js";
+import { listCategories } from "./categories.js";
+import { effectiveSubscriptions } from "./fixed.js";
+import { intSum, notFuture } from "./views.js";
 
 /** month=YYYY-MM 取單月；year=YYYY 取整年 12 個月。 */
 export async function buildStats(

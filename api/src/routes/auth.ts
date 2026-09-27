@@ -2,18 +2,18 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import { eq } from "drizzle-orm";
 import { loginBodySchema, resetPasswordBodySchema, type LoginResponse, type Member } from "@family-ledger/shared";
-import { db } from "../db";
-import { members } from "../db/schema";
+import { db } from "../db/index.js";
+import { members } from "../db/schema.js";
 import {
   LOCK_MINUTES,
   MAX_FAILED_ATTEMPTS,
   hashPassword,
   signToken,
   verifyPassword,
-} from "../lib/auth";
-import { HttpError, unauthorized } from "../lib/errors";
-import { requireAuth, type AppEnv } from "../middleware/auth";
-import { toMember } from "./members";
+} from "../lib/auth.js";
+import { HttpError, unauthorized } from "../lib/errors.js";
+import { requireAuth, type AppEnv } from "../middleware/auth.js";
+import { toMember } from "./members.js";
 
 export const authRoutes = new Hono<AppEnv>();
 

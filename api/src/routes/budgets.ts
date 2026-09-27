@@ -3,12 +3,12 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { budgetUpsertSchema, monthSchema, type Budget } from "@family-ledger/shared";
-import { db } from "../db";
-import { budgets, mainCategories } from "../db/schema";
-import { badRequest } from "../lib/errors";
-import { existsInMonth, prevMonth } from "../lib/dates";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth";
-import { fixedTotal } from "../services/fixed";
+import { db } from "../db/index.js";
+import { budgets, mainCategories } from "../db/schema.js";
+import { badRequest } from "../lib/errors.js";
+import { existsInMonth, prevMonth } from "../lib/dates.js";
+import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { fixedTotal } from "../services/fixed.js";
 
 export const budgetRoutes = new Hono<AppEnv>();
 

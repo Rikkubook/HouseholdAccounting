@@ -11,12 +11,12 @@ import {
   type TransactionRevision,
   type TransactionView,
 } from "@family-ledger/shared";
-import { db } from "../db";
-import { mainCategories, subCategories, transactionRevisions, transactions } from "../db/schema";
-import { badRequest, forbidden, notFound } from "../lib/errors";
-import { monthRange } from "../lib/dates";
-import { requireAuth, type AppEnv } from "../middleware/auth";
-import { findView, toView, transactionViewQuery } from "../services/views";
+import { db } from "../db/index.js";
+import { mainCategories, subCategories, transactionRevisions, transactions } from "../db/schema.js";
+import { badRequest, forbidden, notFound } from "../lib/errors.js";
+import { monthRange } from "../lib/dates.js";
+import { requireAuth, type AppEnv } from "../middleware/auth.js";
+import { findView, toView, transactionViewQuery } from "../services/views.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 

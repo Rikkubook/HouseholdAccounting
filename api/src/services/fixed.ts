@@ -1,8 +1,8 @@
 import { and, desc, eq, lte, or, sql } from "drizzle-orm";
 import type { BillingCycle } from "@family-ledger/shared";
-import { db } from "../db";
-import { subscriptionRevisions, subscriptions } from "../db/schema";
-import { monthOf, monthlyEquivalent } from "../lib/dates";
+import { db } from "../db/index.js";
+import { subscriptionRevisions, subscriptions } from "../db/schema.js";
+import { monthOf, monthlyEquivalent } from "../lib/dates.js";
 
 export interface EffectiveSubscription {
   id: number;

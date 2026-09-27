@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { swaggerUI } from "@hono/swagger-ui";
-import { openApiDocument } from "../docs/openapi";
-import type { AppEnv } from "../middleware/auth";
+import { openApiDocument } from "../docs/openapi.js";
+import type { AppEnv } from "../middleware/auth.js";
 
 /**
  * 文件不需登入即可瀏覽（只描述形狀，不含任何資料）。

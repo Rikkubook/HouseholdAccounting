@@ -1,8 +1,8 @@
 import { and, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
 import type { TransactionView } from "@family-ledger/shared";
-import { db } from "../db";
-import { members, transactions } from "../db/schema";
-import { today } from "../lib/dates";
+import { db } from "../db/index.js";
+import { members, transactions } from "../db/schema.js";
+import { today } from "../lib/dates.js";
 
 /**
  * TransactionView 的分類名稱取自記帳當下的快照，不 join 分類表——

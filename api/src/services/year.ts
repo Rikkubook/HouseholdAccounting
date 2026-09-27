@@ -1,10 +1,10 @@
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { YearCategoryRow, YearSummaryPayload } from "@family-ledger/shared";
-import { db } from "../db";
-import { budgets, mainCategories, members, transactions, yearExtraExpenses } from "../db/schema";
-import { existsInMonth, yearRange } from "../lib/dates";
-import { listCategories } from "./categories";
-import { countAll, intSum, notFuture } from "./views";
+import { db } from "../db/index.js";
+import { budgets, mainCategories, members, transactions, yearExtraExpenses } from "../db/schema.js";
+import { existsInMonth, yearRange } from "../lib/dates.js";
+import { listCategories } from "./categories.js";
+import { countAll, intSum, notFuture } from "./views.js";
 
 /** 年度額外支出不分攤到個別月份，只計入 extra 與 total。 */
 export async function buildYearSummary(year: number): Promise<YearSummaryPayload> {

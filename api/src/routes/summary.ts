@@ -10,13 +10,13 @@ import {
   yearSchema,
   type YearExtraExpense,
 } from "@family-ledger/shared";
-import { db } from "../db";
-import { mainCategories, members, yearExtraExpenses } from "../db/schema";
-import { badRequest, notFound } from "../lib/errors";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth";
-import { buildDashboard } from "../services/dashboard";
-import { buildStats } from "../services/stats";
-import { buildYearSummary } from "../services/year";
+import { db } from "../db/index.js";
+import { mainCategories, members, yearExtraExpenses } from "../db/schema.js";
+import { badRequest, notFound } from "../lib/errors.js";
+import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { buildDashboard } from "../services/dashboard.js";
+import { buildStats } from "../services/stats.js";
+import { buildYearSummary } from "../services/year.js";
 
 export const summaryRoutes = new Hono<AppEnv>();
 summaryRoutes.use("/*", requireAuth);

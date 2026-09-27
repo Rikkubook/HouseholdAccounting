@@ -1,4 +1,4 @@
-import { db } from "../db/index";
+import { db } from "../db/index.js";
 import {
   budgets,
   mainCategories,
@@ -9,8 +9,8 @@ import {
   transactionRevisions,
   transactions,
   yearExtraExpenses,
-} from "../db/schema";
-import { env } from "../env";
+} from "../db/schema.js";
+import { env } from "../env.js";
 
 /**
  * 全庫快照備份。Supabase 免費方案不含 PITR，誤刪或程式寫壞無法還原到時間點，
