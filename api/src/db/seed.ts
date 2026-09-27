@@ -138,7 +138,7 @@ const plan = [
   { cat: 5, subIdx: 0, base: 1200, payer: 2 },
   { cat: 7, subIdx: 0, base: 1600, payer: 2 },
   { cat: 8, subIdx: 0, base: 3200, payer: 1 },
-];
+] as const;
 
 const txRows: (typeof transactions.$inferInsert)[] = [];
 const catName = new Map(categorySeed.map((c) => [c.id, c.name]));

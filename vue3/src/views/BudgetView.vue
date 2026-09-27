@@ -12,7 +12,7 @@ import { useCategoriesStore } from "@/stores/categories";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
-import { currentMonth, existsInMonth, money } from "@/utils/format";
+import { existsInMonth, money } from "@/utils/format";
 
 /** 本頁位於側欄 ADMIN 區，一般成員無法進入，頁內不再區分角色。 */
 const budgets = useBudgetsStore();

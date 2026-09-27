@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+*.tsbuildinfo
 
 # 機密：真實連線字串與金鑰，絕不進版控
 api/.env

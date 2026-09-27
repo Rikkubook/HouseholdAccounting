@@ -38,7 +38,7 @@ export async function chargeOnce(subscriptionId: number): Promise<ChargeResult |
       .onConflictDoNothing({
         target: [transactions.sourceSubscriptionId, transactions.date],
         // 對應 transactions_subscription_period_idx 的 partial 條件，否則 Postgres 推斷不到該索引
-        targetWhere: and(isNotNull(transactions.sourceSubscriptionId), eq(transactions.isDeleted, false)),
+        where: and(isNotNull(transactions.sourceSubscriptionId), eq(transactions.isDeleted, false)),
       })
       .returning({ id: transactions.id });
 
