@@ -9,7 +9,7 @@
     { "path": "/api/cron/backup", "schedule": "30 18 * * 0" }
   ],
   "functions": {
-    "api/[[...route]].ts": {
+    "api/[...route].ts": {
       "maxDuration": 60,
       "memory": 1024
     }

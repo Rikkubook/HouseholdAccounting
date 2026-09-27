@@ -21,7 +21,7 @@ seed 後以 `dad`（管理者）或 `sis`（一般成員）登入，密碼為 `S
 
 ## 部署（Vercel）
 
-API 以 serverless function 形式部署，進入點 `api/api/[[...route]].ts`（catch-all，路徑維持 `/api/*`）。
+API 以 serverless function 形式部署，進入點 `api/api/[...route].ts`（catch-all，路徑維持 `/api/*`）。
 
 1. Vercel 新增 Project，**Root Directory 設為 `api`**，Framework Preset 選 Other。
 2. 環境變數（Production 與 Preview 都要設）：
@@ -122,7 +122,7 @@ shared/                     唯一契約來源（前後端共用）
   types.ts                  z.infer 匯出，等價 vue3/src/types/models.ts
 
 api/
-  api/[[...route]].ts       Vercel serverless 進入點（@hono/vercel）
+  api/[...route].ts         Vercel serverless 進入點（@hono/vercel）
   vercel.json               function runtime 與 build 設定
   sql/0000_init.sql         權威 DDL：表、check 約束、partial index、RLS
   src/
