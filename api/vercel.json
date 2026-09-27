@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": null,
   "installCommand": "pnpm install --frozen-lockfile",
-  "buildCommand": "pnpm --filter @family-ledger/api typecheck",
+  "buildCommand": "pnpm --filter @family-ledger/shared build && pnpm --filter @family-ledger/api typecheck",
   "outputDirectory": "public",
   "crons": [
     { "path": "/api/cron/run-due-charges", "schedule": "0 18 * * *" },

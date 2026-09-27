@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import type * as s from "./schema";
+import type * as s from "./schema.js";
 
 /**
  * 全部由 Zod schema 推導，與 vue3/src/types/models.ts 逐欄位等價。
