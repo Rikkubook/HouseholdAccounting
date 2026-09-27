@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter @family-ledger/api typecheck",
+  "crons": [
+    { "path": "/api/cron/run-due-charges", "schedule": "0 18 * * *" },
+    { "path": "/api/cron/backup", "schedule": "30 18 * * 0" }
+  ],
+  "functions": {
+    "api/[[...route]].ts": {
+      "runtime": "@vercel/node@5",
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  }
+}

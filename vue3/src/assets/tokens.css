@@ -1,0 +1,87 @@
+/* 家庭帳 Design Tokens — 唯一數值來源。Tailwind 由 tailwind.config.ts 映射這些變數。 */
+:root {
+  /* 中性色階 */
+  --canvas: #f6f4f0;
+  --surface: #ffffff;
+  --surface-muted: #efece5;
+  --surface-subtle: #fbfaf8;
+  --track: #eeebe4;
+  --border: rgba(0, 0, 0, 0.07);
+  --border-strong: rgba(0, 0, 0, 0.12);
+
+  --fg-1: #191817;
+  --fg-2: #5c5852;
+  --fg-3: #8b857c;
+  --fg-4: #a8a39a;
+  --fg-disabled: #c3bdb3;
+  --fg-on-brand: #ffffff;
+  --dot-idle: #d5d1c9;
+
+  /* 品牌紫：身分、開關、佔比 */
+  --brand-500: #6b5cf5;
+  --brand-600: #5a44e0;
+  --brand-tint: #f1eefe;
+  --note: #9a8fe8;
+  --gradient-brand: linear-gradient(135deg, #6b5cf5, #b04bd6);
+
+  /* 動作藍：主要新增動作與浮動按鈕 */
+  --action-600: #2559dd;
+  --action-tint: #eef4ff;
+  --gradient-action: linear-gradient(140deg, #2f6bf5, #22b8e6);
+
+  /* 預算三段（唯一的狀態表達方式） */
+  --gradient-budget-ok: linear-gradient(90deg, #2bb3d9, #3ddc97);
+  --gradient-budget-near: linear-gradient(90deg, #f5b23c, #ef7c2b);
+  --gradient-budget-over: linear-gradient(90deg, #f2568f, #d94ba8);
+  --state-near-fg: #c07a1e;
+  --state-over-fg: #d94ba8;
+  --danger-fg: #b03356;
+  --danger-tint: #fdf1f6;
+  --danger-border: rgba(217, 75, 168, 0.28);
+  --warning-fg: #b45309;
+  --warning-tint: #fef3c7;
+  --warning-border: rgba(180, 83, 9, 0.3);
+  --success-fg: #2f7d52;
+  --success-tint: #eef7f1;
+
+  /* 字型 */
+  --font-sans: "Noto Sans TC", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+  --fs-hero: 38px;
+  --fs-metric: 30px;
+  --fs-metric-sm: 26px;
+  --fs-page-title: 20px;
+  --fs-section: 14.5px;
+  --fs-body: 13.5px;
+  --fs-label: 11.5px;
+  --fs-mono: 11px;
+  --ls-hero: -0.03em;
+  --ls-metric: -0.02em;
+  --ls-label: 0.06em;
+
+  /* 圓角 */
+  --r-sm: 7px;
+  --r-md: 9px;
+  --r-lg: 11px;
+  --r-card: 14px;
+  --r-dialog: 18px;
+  --r-pill: 99px;
+
+  /* 版面 */
+  --sidebar-w: 216px;
+  --content-max: 1160px;
+  --card-pad: 22px 24px;
+  --card-pad-mobile: 16px;
+  --grid-gap: 16px;
+  --grid-gap-mobile: 14px;
+  --hit-min: 44px;
+
+  /* 高度與動態 */
+  --shadow-none: none;
+  --shadow-fab: 0 8px 22px rgba(47, 107, 245, 0.34);
+  --shadow-dialog: 0 24px 60px rgba(0, 0, 0, 0.28);
+  --shadow-toast: 0 10px 30px rgba(0, 0, 0, 0.22);
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur-bar: 0.5s;
+  --dur-hover: 0.15s;
+}

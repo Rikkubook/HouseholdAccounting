@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# 機密：真實連線字串與金鑰，絕不進版控
+api/.env
+api/.env.*.local
+
+# 編輯器/系統
+.DS_Store
+Thumbs.db
+
+# Storybook build 輸出
+storybook-static/
+
+# Claude Code 本機設定
+.claude/settings.local.json

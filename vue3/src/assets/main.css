@@ -1,0 +1,46 @@
+@import "./tokens.css";
+@import "material-symbols/rounded.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body {
+    margin: 0;
+    background: var(--canvas);
+    font-family: var(--font-sans);
+    color: var(--fg-1);
+    -webkit-font-smoothing: antialiased;
+  }
+  a {
+    color: var(--brand-500);
+    text-decoration: none;
+  }
+  a:hover {
+    color: var(--brand-600);
+  }
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: #b6b0a6;
+  }
+  /* 金額一律等寬數字 */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .material-symbols-rounded {
+    font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+    line-height: 1;
+    user-select: none;
+  }
+}
