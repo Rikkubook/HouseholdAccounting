@@ -15,7 +15,6 @@ import { advanceCharge, monthlyEquivalent } from "@/utils/format";
  * 移除 VITE_USE_MOCK 即可切換到真 API，不需改動任何 store 或畫面。
  */
 
-const BUDGET_THRESHOLD = 70;
 let currentUserId = 1;
 let seq = 9000;
 
@@ -403,7 +402,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
         return {
           mainCategoryId: c.id, name: c.name, icon: c.icon, months,
           extra: extra || null,
-          total: months.reduce((s, v) => s + (v ?? 0), 0) + extra,
+          total: months.reduce<number>((s, v) => s + (v ?? 0), 0) + extra,
           planned: monthlyBudget ? monthlyBudget * activeMonths : null,
           monthlyBudget, startMonth, endMonth,
         };

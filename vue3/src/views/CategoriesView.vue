@@ -323,7 +323,7 @@ onMounted(() => cats.load());
 
       <template #footer>
         <AppButton variant="primary" size="lg" full-width @click="submit">
-          {{ form && ("id" in form ? form.id : form.subId) ? "儲存變更" : "新增" }}
+          {{ form && (form.kind === "sub" ? form.subId : form.id) ? "儲存變更" : "新增" }}
         </AppButton>
         <AppButton size="lg" @click="form = null">取消</AppButton>
       </template>
