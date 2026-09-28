@@ -18,11 +18,25 @@ http.interceptors.request.use((config) => {
 
 http.interceptors.response.use(
   (res) => res,
-  (error: AxiosError<ApiError>) => {
+  async (error: AxiosError<ApiError>) => {
     if (error.response?.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
       if (location.pathname !== "/login") location.replace("/login");
+      return Promise.reject(normalizeError(error));
     }
+
+    /**
+     * 503（gateway_timeout）是後端偵測到資料庫連線疑似斷線、主動快速失敗、
+     * 換新連線後回的——換好的新連線下一次請求就會正常，故自動重試一次，
+     * 使用者幾乎感覺不到中間這次失敗。用 config 上的旗標避免無限重試。
+     */
+    const config = error.config as (typeof error.config & { _retried503?: boolean }) | undefined;
+    if (error.response?.status === 503 && config && !config._retried503) {
+      config._retried503 = true;
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      return http(config);
+    }
+
     return Promise.reject(normalizeError(error));
   }
 );
