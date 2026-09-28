@@ -9,14 +9,18 @@ import * as schema from "./schema.js";
  * prepare: false 是 Supavisor transaction mode 的硬性要求。
  * 本機長駐時放寬到 10。
  *
- * max_lifetime 刻意壓短：warm function instance 之間重複使用同一條連線時，
- * 如果連線在兩次呼叫之間悄悄斷線（Supavisor 主動斷開、或 function 被凍結
- * 期間網路層斷線），下一次查詢會卡在一條沒人發現已經死掉的連線上，
- * 一路卡到 Vercel 的 60 秒逾時（而非乾淨地丟出連線錯誤）。縮短存活時間、
- * 強迫定期換新連線，降低卡死機率——但無法百分之百根除，故搭配
- * app.ts 的逾時中介層，偵測到請求卡住就呼叫 resetConnection()。
+ * Transaction mode 這個埠本來就是設計給「每次請求開新連線、用完即關」的
+ * 短生命週期用法，不是拿來讓連線跨請求長駐重複使用。Vercel 在兩次請求
+ * 之間會把整個 process 凍結，凍結期間所有計時器（包含這裡的 idle_timeout /
+ * max_lifetime）都不會運作，如果凍結期間網路路徑把連線悄悄斷開（沒有任何
+ * 一方在監聽，不會收到 FIN/RST），process 解凍後這條連線在程式眼中仍是
+ * 「活著」的，直到真的送出查詢才會發現對方沒反應——而且往往永遠等不到
+ * 明確的錯誤，只會無限卡住。所以 serverless 環境下不嘗試沿用舊連線，改成
+ * 每個 HTTP 請求一開始就呼叫 resetConnection() 換一條保證沒跨越過凍結期間
+ * 的全新連線（見 app.ts 的中介層）；這裡的 idle_timeout / max_lifetime 只當
+ * 保底，不是主要防線。
  */
-const serverless = Boolean(process.env.VERCEL);
+export const serverless = Boolean(process.env.VERCEL);
 
 function createClient() {
   return postgres(env.DATABASE_URL, {

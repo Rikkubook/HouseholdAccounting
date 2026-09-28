@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 import { ZodError } from "zod";
 import { corsOrigins, env } from "./env.js";
-import { resetConnection } from "./db/index.js";
+import { resetConnection, serverless } from "./db/index.js";
 import { HttpError } from "./lib/errors.js";
 import { authRoutes } from "./routes/auth.js";
 import { budgetRoutes } from "./routes/budgets.js";
@@ -30,6 +30,19 @@ app.use(
 );
 
 app.get("/health", (c) => c.json({ ok: true }));
+
+/**
+ * Serverless 環境下，每個 HTTP 請求一開始就強制換一條全新連線，不沿用
+ * 可能跨越過 process 凍結期間、已經悄悄斷線的舊連線（見 db/index.ts
+ * 開頭註解）。同一 warm instance 若並發處理多個請求，各自換到的新連線
+ * 會各自獨立握手，彼此不影響；換下來的舊連線在背景優雅關閉，不強殺。
+ */
+if (serverless) {
+  app.use("/api/*", async (_c, next) => {
+    resetConnection();
+    await next();
+  });
+}
 
 /**
  * Serverless 環境下資料庫連線偶爾會悄悄斷線（見 db/index.ts 註解），
