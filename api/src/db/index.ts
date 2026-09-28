@@ -24,7 +24,17 @@ export const serverless = Boolean(process.env.VERCEL);
 
 function createClient() {
   return postgres(env.DATABASE_URL, {
-    max: serverless ? 1 : 10,
+    /**
+     * 不能壓到 1：service 層多處用 Promise.all 平行送出好幾支查詢
+     * （見 services/categories.ts、dashboard.ts、stats.ts、year.ts、
+     * routes/budgets.ts、routes/transactions.ts）。單一連線下這些平行
+     * 查詢會擠在同一條連線上用 pipelining 送出，Supavisor 的 transaction
+     * 模式不保證正確處理同連線平行查詢，會讓其中一支永遠等不到回應、
+     * 卡到我們自己的逾時才失敗——這才是 categories／dashboard／stats 等
+     * 頁面間歇性卡死 15 秒的真正原因，不是連線新舊的問題。給一點餘裕
+     * 讓平行查詢各自拿到自己的實體連線即可。
+     */
+    max: serverless ? 5 : 10,
     idle_timeout: serverless ? 10 : 20,
     max_lifetime: serverless ? 30 : undefined,
     connect_timeout: 10,
