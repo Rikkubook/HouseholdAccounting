@@ -4,7 +4,9 @@ import type { ApiError } from "@/types/models";
 /** 後端為 Node（camelCase JSON），不做欄位轉換。 */
 export const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE ?? "/api",
-  timeout: 15000,
+  // 需明顯大於後端 app.ts 的 DB_TIMEOUT_MS（15s），否則後端來得及回
+  // 乾淨的 503 之前，前端會先自己判定逾時（拿到 axios 的 timeout 錯誤）。
+  timeout: 20000,
   headers: { "Content-Type": "application/json" },
 });
 

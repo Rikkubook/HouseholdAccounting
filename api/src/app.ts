@@ -33,12 +33,18 @@ app.get("/health", (c) => c.json({ ok: true }));
 
 /**
  * Serverless 環境下資料庫連線偶爾會悄悄斷線（見 db/index.ts 註解），
- * 卡住的查詢會一路等到 Vercel 60 秒逾時才有動靜。這裡先用 8 秒的
- * 應用層逾時擋在前面：request 卡超過 8 秒就當作連線已死，強制換一條
- * 新連線並快速回錯誤，不讓使用者乾等一分鐘；換過的新連線會讓下一次
- * 請求（同一個 warm instance 也好、新的也好）恢復正常。
+ * 卡住的查詢會一路等到 Vercel 60 秒逾時才有動靜。這裡先用應用層逾時
+ * 擋在前面：request 卡太久就當作連線已死，強制換一條新連線並快速回
+ * 錯誤，不讓使用者乾等一分鐘；換過的新連線會讓下一次請求（同一個
+ * warm instance 也好、新的也好）恢復正常。
+ *
+ * 門檻必須明顯大於 db/index.ts 的 connect_timeout（10 秒）：cold
+ * instance 建立全新連線本身就可能花到接近 10 秒，這是正常握手時間，
+ * 不代表連線壞掉。之前這裡設 8 秒，比 connect_timeout 還短，等於在
+ * 健康的冷連線握手途中就搶先誤判、強制重置並回 503——這正是「dashboard
+ * 一次平行打好幾支 API、其中一兩支落在冷 instance 上就跳 503」的成因。
  */
-const DB_TIMEOUT_MS = 8000;
+const DB_TIMEOUT_MS = 15000;
 app.use("/api/*", async (c, next) => {
   let finished = false;
   const timedOut = new Promise<"timeout">((resolve) => {
