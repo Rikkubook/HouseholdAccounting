@@ -37,12 +37,20 @@ let currentDb = drizzle(currentSql, { schema });
  * `import { db, sql } from "./index.js"` 用法完全不用改——底層實際
  * 指向的 client 換掉後，下一次查詢就會自動用到新連線。
  * 舊連線背景關閉、不等待，避免它本身的關閉卡住新連線生效。
+ *
+ * 關閉時刻意不給短 timeout 強制砸斷：這條連線上可能還有查詢正在跑
+ * （同一個 warm instance 上並發的其他請求，或這次逾時之前就已送出、
+ * 仍在背景等待的那個查詢），強制 terminate 會讓那些查詢直接收到
+ * CONNECTION_DESTROYED 而爆掉，變成使用者看到的 500，而不是我們設計
+ * 中乾淨的 503。不傳 timeout 讓 postgres.js 優雅等待既有查詢自然結束
+ * 再關閉；真正掛死的連線本來就不會再有新查詢送進來，多留一陣子也
+ * 沒有實質壞處，最終會被 Supavisor 自己的 idle timeout 回收。
  */
 export function resetConnection() {
   const dying = currentSql;
   currentSql = createClient();
   currentDb = drizzle(currentSql, { schema });
-  dying.end({ timeout: 1 }).catch(() => {});
+  dying.end().catch(() => {});
 }
 
 function bindIfFn(value: unknown, thisArg: unknown) {

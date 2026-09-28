@@ -90,6 +90,17 @@ app.route("/api", api);
 app.onError((err, c) => {
   if (err instanceof HttpError) return c.json(err.toJSON(), err.status);
 
+  /**
+   * postgres.js 在連線被關閉／砸斷時，任何還掛在那條連線上的查詢都會
+   * 收到這類 code（見 db/index.ts 的 resetConnection() 註解）。這屬於
+   * 連線層的暫時性問題，不是這次請求本身的錯——回 503 讓前端
+   * client.ts 既有的自動重試邏輯接手，使用者不會看到硬錯誤。
+   */
+  const code = (err as { code?: string }).code;
+  if (code === "CONNECTION_DESTROYED" || code === "CONNECTION_CLOSED" || code === "CONNECTION_ENDED") {
+    return c.json({ code: "gateway_timeout", message: "伺服器忙碌，請重試一次" }, 503);
+  }
+
   if (err instanceof ZodError) {
     const first = err.issues[0];
     return c.json({ code: "validation_error", message: first?.message ?? "輸入格式不正確" }, 400);
