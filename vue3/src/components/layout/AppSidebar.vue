@@ -5,6 +5,7 @@ import { NAV_ITEMS } from "@/router/nav";
 
 const route = useRoute();
 const auth = useAuthStore();
+const appVersion = __APP_VERSION__;
 </script>
 
 <template>
@@ -60,5 +61,6 @@ const auth = useAuthStore();
         <span class="material-symbols-rounded text-[18px]">logout</span>
       </button>
     </div>
+    <div class="px-5 font-mono text-[10px] text-fg-4">v{{ appVersion }}</div>
   </nav>
 </template>

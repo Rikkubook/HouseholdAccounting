@@ -10,6 +10,7 @@ const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
 const drawerOpen = ref(false);
+const appVersion = __APP_VERSION__;
 
 function go(to: string) {
   drawerOpen.value = false;
@@ -67,6 +68,7 @@ function go(to: string) {
           >
             <span class="material-symbols-rounded text-[18px]">logout</span>登出
           </button>
+          <div class="px-5 pt-2 font-mono text-[10px] text-fg-4">v{{ appVersion }}</div>
         </div>
       </div>
     </Teleport>
