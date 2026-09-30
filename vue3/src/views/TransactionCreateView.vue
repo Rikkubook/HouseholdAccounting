@@ -78,7 +78,7 @@ onMounted(() => cats.load());
 </script>
 
 <template>
-  <AppShell title="新增交易" subtitle="記帳者自動帶入登入者" back-to="/">
+  <AppShell title="新增交易" subtitle="記帳者自動帶入登入者" back-to="/" :loading="cats.initialLoading">
     <AppCard>
       <div class="flex flex-col gap-4">
         <SegmentedControl

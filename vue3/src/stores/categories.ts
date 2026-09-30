@@ -6,6 +6,8 @@ import type { MainCategory } from "@/types/models";
 export const useCategoriesStore = defineStore("categories", () => {
   const items = ref<MainCategory[]>([]);
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
+  const initialLoading = ref(true);
 
   /** 新增／編輯交易的選單只顯示啟用中的分類。 */
   const selectable = computed(() =>
@@ -26,6 +28,7 @@ export const useCategoriesStore = defineStore("categories", () => {
       items.value = await categoriesApi.list(true);
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
@@ -38,6 +41,7 @@ export const useCategoriesStore = defineStore("categories", () => {
   return {
     items,
     loading,
+    initialLoading,
     selectable,
     floating,
     fixed,

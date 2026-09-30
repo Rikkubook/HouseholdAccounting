@@ -82,7 +82,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="預算管理" subtitle="每月各浮動支出分類的上限" back-to="/">
+  <AppShell title="預算管理" subtitle="每月各浮動支出分類的上限" back-to="/" :loading="budgets.initialLoading">
     <template #actions>
       <MonthStepper :model-value="budgets.month" @update:model-value="load" />
       <AppButton icon="content_copy" @click="copyPrevious">沿用上月</AppButton>

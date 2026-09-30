@@ -8,6 +8,8 @@ export const useDashboardStore = defineStore("dashboard", () => {
   const month = ref(currentMonth());
   const data = ref<DashboardPayload | null>(null);
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true；切換本月/上月重新查詢時維持 false。 */
+  const initialLoading = ref(true);
 
   async function load(target = month.value) {
     loading.value = true;
@@ -16,8 +18,9 @@ export const useDashboardStore = defineStore("dashboard", () => {
       data.value = await summaryApi.dashboard(target);
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
-  return { month, data, loading, load };
+  return { month, data, loading, initialLoading, load };
 });

@@ -18,6 +18,8 @@ const payerId = ref<number | null>(null);
 const data = ref<StatsPayload | null>(null);
 const openCategoryId = ref<number | null>(null);
 const loading = ref(false);
+/** 只在第一次載入完成前為 true；切換範圍/月份/成員重新查詢時維持 false。 */
+const initialLoading = ref(true);
 
 const thisYear = new Date().getFullYear();
 const yearOptions = computed(() => [thisYear, thisYear - 1, thisYear - 2]);
@@ -39,6 +41,7 @@ async function load() {
     );
   } finally {
     loading.value = false;
+    initialLoading.value = false;
   }
 }
 
@@ -50,7 +53,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="統計圖表" subtitle="消費結構與實際 vs 預計對照" back-to="/">
+  <AppShell title="統計圖表" subtitle="消費結構與實際 vs 預計對照" back-to="/" :loading="initialLoading">
     <AppCard pad="compact">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap">
         <SegmentedControl

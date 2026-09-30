@@ -12,14 +12,15 @@ withDefaults(defineProps<{ size?: number; stopped?: boolean; /** 圓環中間的
 </script>
 
 <template>
-  <div class="ring" :class="{ 'is-stopped': stopped }" :style="{ '--size': `${size}px` }" aria-hidden="true">
+  <div class="spinner-ring" :class="{ 'is-stopped': stopped }" :style="{ '--size': `${size}px` }" aria-hidden="true">
     <div class="arc" />
     <div v-if="icon" class="ring-icon"><AppIcon :name="icon" :size="Math.round(size * 0.46)" /></div>
   </div>
 </template>
 
 <style scoped>
-.ring {
+/* 特意不叫 .ring：Tailwind 內建同名工具類別會注入預設藍色 box-shadow，跟這裡的定位樣式疊在一起。 */
+.spinner-ring {
   --arc-start: var(--brand-500);
   --arc-end: var(--brand-magenta);
   position: relative;

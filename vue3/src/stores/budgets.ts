@@ -14,6 +14,8 @@ export const useBudgetsStore = defineStore("budgets", () => {
   const fixedTotal = ref(0);
   const spentByCategory = ref<Record<number, number>>({});
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true；換月重新查詢時維持 false。 */
+  const initialLoading = ref(true);
 
   const total = computed(() => items.value.reduce((s, b) => s + b.amount, 0) + fixedTotal.value);
 
@@ -35,6 +37,7 @@ export const useBudgetsStore = defineStore("budgets", () => {
       spentByCategory.value = Object.fromEntries(stats.floating.map((r) => [r.mainCategoryId, r.amount]));
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
@@ -44,6 +47,7 @@ export const useBudgetsStore = defineStore("budgets", () => {
     fixedTotal,
     spentByCategory,
     loading,
+    initialLoading,
     total,
     amountOf,
     load,

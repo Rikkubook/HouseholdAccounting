@@ -18,6 +18,8 @@ export const useTransactionsStore = defineStore("transactions", () => {
   });
   const result = ref<Paged<TransactionView>>({ items: [], total: 0, page: 1, pageSize: PAGE_SIZE });
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true；篩選/換頁重新查詢時維持 false，避免整個篩選列被 loading 畫面蓋掉。 */
+  const initialLoading = ref(true);
 
   const isEmpty = computed(() => !loading.value && result.value.items.length === 0);
 
@@ -42,6 +44,7 @@ export const useTransactionsStore = defineStore("transactions", () => {
       result.value = await transactionsApi.list(query.value);
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
@@ -54,6 +57,7 @@ export const useTransactionsStore = defineStore("transactions", () => {
     query,
     result,
     loading,
+    initialLoading,
     isEmpty,
     groupedByDate,
     load,

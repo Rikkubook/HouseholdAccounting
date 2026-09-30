@@ -158,7 +158,7 @@ onMounted(() => cats.load());
 </script>
 
 <template>
-  <AppShell title="分類設定" subtitle="分類為主檔，異動立即全域生效" back-to="/">
+  <AppShell title="分類設定" subtitle="分類為主檔，異動立即全域生效" back-to="/" :loading="cats.initialLoading">
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNewMain">新增主分類</AppButton>
     </template>

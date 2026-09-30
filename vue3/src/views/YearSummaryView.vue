@@ -26,6 +26,8 @@ const thisYear = new Date().getFullYear();
 const year = ref(thisYear);
 const data = ref<YearSummaryPayload | null>(null);
 const loading = ref(false);
+/** 只在第一次載入完成前為 true；切換年度重新查詢時維持 false。 */
+const initialLoading = ref(true);
 
 interface ExtraForm {
   name: string;
@@ -73,6 +75,7 @@ async function load() {
     data.value = await summaryApi.year(year.value);
   } finally {
     loading.value = false;
+    initialLoading.value = false;
   }
 }
 
@@ -116,7 +119,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="年度彙整" subtitle="橫向檢視 12 個月各分類金額" back-to="/">
+  <AppShell title="年度彙整" subtitle="橫向檢視 12 個月各分類金額" back-to="/" :loading="initialLoading">
     <template #actions>
       <select
         v-model.number="year"

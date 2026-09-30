@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import AppSidebar from "./AppSidebar.vue";
 import MobileTopBar from "./MobileTopBar.vue";
+import AppLoading from "@/components/base/AppLoading.vue";
 
-defineProps<{ title: string; subtitle?: string; backTo?: string }>();
+/** loading 為 true 時，內容區改顯示 AppLoading（非全螢幕），header 與 actions 維持可見。 */
+defineProps<{ title: string; subtitle?: string; backTo?: string; loading?: boolean }>();
 </script>
 
 <template>
@@ -19,7 +21,10 @@ defineProps<{ title: string; subtitle?: string; backTo?: string }>();
         <div class="flex gap-2 flex-wrap"><slot name="actions" /></div>
       </div>
 
-      <div class="flex flex-col gap-3.5 md:gap-4"><slot /></div>
+      <div class="flex flex-col gap-3.5 md:gap-4">
+        <AppLoading v-if="loading" :fullscreen="false" />
+        <slot v-else />
+      </div>
     </div>
 
     <slot name="fab" />

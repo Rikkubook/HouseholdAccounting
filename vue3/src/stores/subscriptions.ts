@@ -7,6 +7,8 @@ import { monthlyEquivalent, todayISO } from "@/utils/format";
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
   const items = ref<Subscription[]>([]);
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
+  const initialLoading = ref(true);
 
   const activeItems = computed(() => items.value.filter((s) => s.isActive));
   /** 首頁固定支出總額＝月換算合計（年繳 ÷12）。 */
@@ -34,6 +36,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
       items.value = await subscriptionsApi.list();
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
@@ -46,6 +49,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
   return {
     items,
     loading,
+    initialLoading,
     activeItems,
     monthlyTotal,
     yearlyTotal,

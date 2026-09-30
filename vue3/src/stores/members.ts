@@ -6,6 +6,8 @@ import type { Member } from "@/types/models";
 export const useMembersStore = defineStore("members", () => {
   const items = ref<Member[]>([]);
   const loading = ref(false);
+  /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
+  const initialLoading = ref(true);
 
   /** 停用成員不出現在記帳者、扣款人與統計篩選。 */
   const active = computed(() => items.value.filter((m) => m.isActive));
@@ -22,6 +24,7 @@ export const useMembersStore = defineStore("members", () => {
       items.value = await membersApi.list();
     } finally {
       loading.value = false;
+      initialLoading.value = false;
     }
   }
 
@@ -34,6 +37,7 @@ export const useMembersStore = defineStore("members", () => {
   return {
     items,
     loading,
+    initialLoading,
     active,
     activeAdmins,
     archivedCount,
