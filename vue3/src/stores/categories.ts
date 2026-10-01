@@ -2,12 +2,14 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { categoriesApi, type MainCategoryDraft } from "@/api/categories";
 import type { MainCategory } from "@/types/models";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const useCategoriesStore = defineStore("categories", () => {
   const items = ref<MainCategory[]>([]);
   const loading = ref(false);
   /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
   const initialLoading = ref(true);
+  const error = ref<LoadErrorKind | null>(null);
 
   /** 新增／編輯交易的選單只顯示啟用中的分類。 */
   const selectable = computed(() =>
@@ -24,8 +26,11 @@ export const useCategoriesStore = defineStore("categories", () => {
 
   async function load() {
     loading.value = true;
+    error.value = null;
     try {
       items.value = await categoriesApi.list(true);
+    } catch (e) {
+      error.value = toLoadErrorKind(e);
     } finally {
       loading.value = false;
       initialLoading.value = false;
@@ -42,6 +47,7 @@ export const useCategoriesStore = defineStore("categories", () => {
     items,
     loading,
     initialLoading,
+    error,
     selectable,
     floating,
     fixed,

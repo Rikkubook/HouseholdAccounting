@@ -4,6 +4,7 @@
   "installCommand": "pnpm install --frozen-lockfile",
   "buildCommand": "pnpm --filter @family-ledger/shared build && pnpm --filter @family-ledger/api typecheck",
   "outputDirectory": "public",
+  "regions": ["hnd1"],
   "crons": [
     { "path": "/api/cron/run-due-charges", "schedule": "0 18 * * *" },
     { "path": "/api/cron/backup", "schedule": "30 18 * * 0" }

@@ -96,7 +96,14 @@ onMounted(() => store.load());
 </script>
 
 <template>
-  <AppShell title="成員管理" subtitle="停用不刪除；歷史紀錄完整保留" back-to="/" :loading="store.initialLoading">
+  <AppShell
+    title="成員管理"
+    subtitle="停用不刪除；歷史紀錄完整保留"
+    back-to="/"
+    :loading="store.initialLoading"
+    :error="store.error"
+    @retry="store.load()"
+  >
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNew">新增成員</AppButton>
     </template>

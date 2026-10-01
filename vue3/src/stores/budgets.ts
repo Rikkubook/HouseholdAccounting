@@ -4,6 +4,7 @@ import { budgetsApi } from "@/api/budgets";
 import { summaryApi } from "@/api/summary";
 import type { Budget } from "@/types/models";
 import { currentMonth, monthlyEquivalent } from "@/utils/format";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const BUDGET_THRESHOLD = 70;
 
@@ -16,6 +17,7 @@ export const useBudgetsStore = defineStore("budgets", () => {
   const loading = ref(false);
   /** 只在第一次載入完成前為 true；換月重新查詢時維持 false。 */
   const initialLoading = ref(true);
+  const error = ref<LoadErrorKind | null>(null);
 
   const total = computed(() => items.value.reduce((s, b) => s + b.amount, 0) + fixedTotal.value);
 
@@ -25,6 +27,7 @@ export const useBudgetsStore = defineStore("budgets", () => {
 
   async function load(target = month.value) {
     loading.value = true;
+    error.value = null;
     month.value = target;
     try {
       const [list, fixed, stats] = await Promise.all([
@@ -35,6 +38,8 @@ export const useBudgetsStore = defineStore("budgets", () => {
       items.value = list;
       fixedTotal.value = fixed.amount;
       spentByCategory.value = Object.fromEntries(stats.floating.map((r) => [r.mainCategoryId, r.amount]));
+    } catch (e) {
+      error.value = toLoadErrorKind(e);
     } finally {
       loading.value = false;
       initialLoading.value = false;
@@ -48,6 +53,7 @@ export const useBudgetsStore = defineStore("budgets", () => {
     spentByCategory,
     loading,
     initialLoading,
+    error,
     total,
     amountOf,
     load,

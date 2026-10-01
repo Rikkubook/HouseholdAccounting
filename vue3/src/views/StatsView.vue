@@ -8,6 +8,7 @@ import ChipGroup from "@/components/base/ChipGroup.vue";
 import { summaryApi, type StatsPayload } from "@/api/summary";
 import { useMembersStore } from "@/stores/members";
 import { currentMonth, money, percent } from "@/utils/format";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const members = useMembersStore();
 
@@ -20,6 +21,7 @@ const openCategoryId = ref<number | null>(null);
 const loading = ref(false);
 /** 只在第一次載入完成前為 true；切換範圍/月份/成員重新查詢時維持 false。 */
 const initialLoading = ref(true);
+const error = ref<LoadErrorKind | null>(null);
 
 const thisYear = new Date().getFullYear();
 const yearOptions = computed(() => [thisYear, thisYear - 1, thisYear - 2]);
@@ -32,6 +34,7 @@ const payerOptions = computed(() => [
 
 async function load() {
   loading.value = true;
+  error.value = null;
   openCategoryId.value = null; // 切換範圍或成員時退回主分類層
   try {
     data.value = await summaryApi.stats(
@@ -39,6 +42,8 @@ async function load() {
       range.value === "month" ? month.value : String(year.value),
       payerId.value
     );
+  } catch (e) {
+    error.value = toLoadErrorKind(e);
   } finally {
     loading.value = false;
     initialLoading.value = false;
@@ -53,7 +58,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="統計圖表" subtitle="消費結構與實際 vs 預計對照" back-to="/" :loading="initialLoading">
+  <AppShell
+    title="統計圖表"
+    subtitle="消費結構與實際 vs 預計對照"
+    back-to="/"
+    :loading="initialLoading"
+    :error="error"
+    @retry="load"
+  >
     <AppCard pad="compact">
       <div class="flex flex-col gap-3 md:flex-row md:items-center md:flex-wrap">
         <SegmentedControl

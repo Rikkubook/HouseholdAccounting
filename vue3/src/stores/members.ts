@@ -2,12 +2,14 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { membersApi, type MemberDraft } from "@/api/members";
 import type { Member } from "@/types/models";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const useMembersStore = defineStore("members", () => {
   const items = ref<Member[]>([]);
   const loading = ref(false);
   /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
   const initialLoading = ref(true);
+  const error = ref<LoadErrorKind | null>(null);
 
   /** 停用成員不出現在記帳者、扣款人與統計篩選。 */
   const active = computed(() => items.value.filter((m) => m.isActive));
@@ -20,8 +22,11 @@ export const useMembersStore = defineStore("members", () => {
 
   async function load() {
     loading.value = true;
+    error.value = null;
     try {
       items.value = await membersApi.list();
+    } catch (e) {
+      error.value = toLoadErrorKind(e);
     } finally {
       loading.value = false;
       initialLoading.value = false;
@@ -38,6 +43,7 @@ export const useMembersStore = defineStore("members", () => {
     items,
     loading,
     initialLoading,
+    error,
     active,
     activeAdmins,
     archivedCount,

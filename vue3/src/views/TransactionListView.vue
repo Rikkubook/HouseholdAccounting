@@ -83,7 +83,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="交易列表" subtitle="依建立時間由近到遠" back-to="/" :loading="store.initialLoading">
+  <AppShell
+    title="交易列表"
+    subtitle="依建立時間由近到遠"
+    back-to="/"
+    :loading="store.initialLoading"
+    :error="store.error"
+    @retry="store.load()"
+  >
     <template #actions>
       <RouterLink
         to="/transactions/new"

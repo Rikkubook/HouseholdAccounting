@@ -3,12 +3,14 @@ import { computed, ref } from "vue";
 import { subscriptionsApi, type SubscriptionDraft } from "@/api/subscriptions";
 import type { Subscription } from "@/types/models";
 import { monthlyEquivalent, todayISO } from "@/utils/format";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
   const items = ref<Subscription[]>([]);
   const loading = ref(false);
   /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
   const initialLoading = ref(true);
+  const error = ref<LoadErrorKind | null>(null);
 
   const activeItems = computed(() => items.value.filter((s) => s.isActive));
   /** 首頁固定支出總額＝月換算合計（年繳 ÷12）。 */
@@ -32,8 +34,11 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
 
   async function load() {
     loading.value = true;
+    error.value = null;
     try {
       items.value = await subscriptionsApi.list();
+    } catch (e) {
+      error.value = toLoadErrorKind(e);
     } finally {
       loading.value = false;
       initialLoading.value = false;
@@ -50,6 +55,7 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
     items,
     loading,
     initialLoading,
+    error,
     activeItems,
     monthlyTotal,
     yearlyTotal,

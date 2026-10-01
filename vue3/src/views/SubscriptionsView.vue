@@ -118,7 +118,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="訂閱管理" subtitle="固定支出的來源；停用不刪除" back-to="/" :loading="store.initialLoading">
+  <AppShell
+    title="訂閱管理"
+    subtitle="固定支出的來源；停用不刪除"
+    back-to="/"
+    :loading="store.initialLoading"
+    :error="store.error"
+    @retry="store.load()"
+  >
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNew">新增訂閱</AppButton>
     </template>

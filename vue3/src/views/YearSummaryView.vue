@@ -17,6 +17,7 @@ import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
 import { money } from "@/utils/format";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const cats = useCategoriesStore();
 const members = useMembersStore();
@@ -28,6 +29,7 @@ const data = ref<YearSummaryPayload | null>(null);
 const loading = ref(false);
 /** 只在第一次載入完成前為 true；切換年度重新查詢時維持 false。 */
 const initialLoading = ref(true);
+const error = ref<LoadErrorKind | null>(null);
 
 interface ExtraForm {
   name: string;
@@ -71,8 +73,11 @@ const memberTotal = computed(() => (data.value?.byMember ?? []).reduce((s, m) =>
 
 async function load() {
   loading.value = true;
+  error.value = null;
   try {
     data.value = await summaryApi.year(year.value);
+  } catch (e) {
+    error.value = toLoadErrorKind(e);
   } finally {
     loading.value = false;
     initialLoading.value = false;
@@ -119,7 +124,14 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AppShell title="年度彙整" subtitle="橫向檢視 12 個月各分類金額" back-to="/" :loading="initialLoading">
+  <AppShell
+    title="年度彙整"
+    subtitle="橫向檢視 12 個月各分類金額"
+    back-to="/"
+    :loading="initialLoading"
+    :error="error"
+    @retry="load"
+  >
     <template #actions>
       <select
         v-model.number="year"

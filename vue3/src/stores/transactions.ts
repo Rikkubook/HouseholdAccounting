@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { transactionsApi, type Paged, type TransactionQuery } from "@/api/transactions";
 import type { TransactionPatch, TransactionView } from "@/types/models";
 import { currentMonth } from "@/utils/format";
+import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const PAGE_SIZE = 20;
 
@@ -20,6 +21,7 @@ export const useTransactionsStore = defineStore("transactions", () => {
   const loading = ref(false);
   /** 只在第一次載入完成前為 true；篩選/換頁重新查詢時維持 false，避免整個篩選列被 loading 畫面蓋掉。 */
   const initialLoading = ref(true);
+  const error = ref<LoadErrorKind | null>(null);
 
   const isEmpty = computed(() => !loading.value && result.value.items.length === 0);
 
@@ -40,8 +42,11 @@ export const useTransactionsStore = defineStore("transactions", () => {
 
   async function load() {
     loading.value = true;
+    error.value = null;
     try {
       result.value = await transactionsApi.list(query.value);
+    } catch (e) {
+      error.value = toLoadErrorKind(e);
     } finally {
       loading.value = false;
       initialLoading.value = false;
@@ -58,6 +63,7 @@ export const useTransactionsStore = defineStore("transactions", () => {
     result,
     loading,
     initialLoading,
+    error,
     isEmpty,
     groupedByDate,
     load,

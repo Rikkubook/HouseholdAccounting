@@ -25,7 +25,13 @@ onMounted(() => store.load());
 </script>
 
 <template>
-  <AppShell title="首頁儀表板" subtitle="本月收支與各浮動支出分類的預算使用狀況" :loading="store.initialLoading">
+  <AppShell
+    title="首頁儀表板"
+    subtitle="本月收支與各浮動支出分類的預算使用狀況"
+    :loading="store.initialLoading"
+    :error="store.error"
+    @retry="store.load()"
+  >
     <template #actions>
       <SegmentedControl :options="periodOptions" :model-value="store.month" @update:model-value="store.load($event)" />
       <RouterLink
