@@ -3,6 +3,7 @@ import type { YearCategoryRow, YearSummaryPayload } from "@family-ledger/shared"
 import { db } from "../db/index.js";
 import { budgets, mainCategories, members, transactions, yearExtraExpenses } from "../db/schema.js";
 import { currentMonth, existsInMonth, yearRange } from "../lib/dates.js";
+import { timed } from "../lib/timed.js";
 import { listCategories } from "./categories.js";
 import { countAll, intSum, notFuture } from "./views.js";
 
@@ -22,49 +23,61 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
 
   const [byCatMonth, totals, monthsWithData, budgetRows, categories, extras, byMemberRows] =
     await Promise.all([
-      db
-        .select({
-          mainCategoryId: transactions.mainCategoryId,
-          month: monthExpr,
-          amount: intSum(transactions.amount),
-        })
-        .from(transactions)
-        .where(and(inYear, eq(transactions.type, "expense")))
-        .groupBy(transactions.mainCategoryId, monthExpr),
-      db
-        .select({ type: transactions.type, amount: intSum(transactions.amount) })
-        .from(transactions)
-        .where(inYear)
-        .groupBy(transactions.type),
-      db.selectDistinct({ month: monthExpr }).from(transactions).where(inYear),
-      db.select().from(budgets).where(inArray(budgets.month, months)),
-      listCategories(true),
-      db
-        .select({
-          id: yearExtraExpenses.id,
-          year: yearExtraExpenses.year,
-          name: yearExtraExpenses.name,
-          amount: yearExtraExpenses.amount,
-          mainCategoryId: yearExtraExpenses.mainCategoryId,
-          payerId: yearExtraExpenses.payerId,
-          categoryName: mainCategories.name,
-          payerName: members.name,
-        })
-        .from(yearExtraExpenses)
-        .innerJoin(mainCategories, eq(mainCategories.id, yearExtraExpenses.mainCategoryId))
-        .innerJoin(members, eq(members.id, yearExtraExpenses.payerId))
-        .where(eq(yearExtraExpenses.year, year)),
-      db
-        .select({
-          memberId: transactions.payerId,
-          name: members.name,
-          amount: intSum(transactions.amount),
-          count: countAll(),
-        })
-        .from(transactions)
-        .innerJoin(members, eq(members.id, transactions.payerId))
-        .where(and(inYear, eq(transactions.type, "expense")))
-        .groupBy(transactions.payerId, members.name),
+      timed(
+        "year.byCatMonth",
+        db
+          .select({
+            mainCategoryId: transactions.mainCategoryId,
+            month: monthExpr,
+            amount: intSum(transactions.amount),
+          })
+          .from(transactions)
+          .where(and(inYear, eq(transactions.type, "expense")))
+          .groupBy(transactions.mainCategoryId, monthExpr)
+      ),
+      timed(
+        "year.totals",
+        db
+          .select({ type: transactions.type, amount: intSum(transactions.amount) })
+          .from(transactions)
+          .where(inYear)
+          .groupBy(transactions.type)
+      ),
+      timed("year.monthsWithData", db.selectDistinct({ month: monthExpr }).from(transactions).where(inYear)),
+      timed("year.budgetRows", db.select().from(budgets).where(inArray(budgets.month, months))),
+      timed("year.categories", listCategories(true)),
+      timed(
+        "year.extras",
+        db
+          .select({
+            id: yearExtraExpenses.id,
+            year: yearExtraExpenses.year,
+            name: yearExtraExpenses.name,
+            amount: yearExtraExpenses.amount,
+            mainCategoryId: yearExtraExpenses.mainCategoryId,
+            payerId: yearExtraExpenses.payerId,
+            categoryName: mainCategories.name,
+            payerName: members.name,
+          })
+          .from(yearExtraExpenses)
+          .innerJoin(mainCategories, eq(mainCategories.id, yearExtraExpenses.mainCategoryId))
+          .innerJoin(members, eq(members.id, yearExtraExpenses.payerId))
+          .where(eq(yearExtraExpenses.year, year))
+      ),
+      timed(
+        "year.byMember",
+        db
+          .select({
+            memberId: transactions.payerId,
+            name: members.name,
+            amount: intSum(transactions.amount),
+            count: countAll(),
+          })
+          .from(transactions)
+          .innerJoin(members, eq(members.id, transactions.payerId))
+          .where(and(inYear, eq(transactions.type, "expense")))
+          .groupBy(transactions.payerId, members.name)
+      ),
     ]);
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;

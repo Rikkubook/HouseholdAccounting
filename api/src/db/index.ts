@@ -4,21 +4,19 @@ import { env } from "../env.js";
 import * as schema from "./schema.js";
 
 /**
- * Serverless（Vercel）：每個 function instance 各開自己的連線，故 max 壓到 1，
- * 由 Supabase Supavisor（連接埠 6543，transaction mode）承擔真正的池化。
+ * Serverless（Vercel）：每個 function instance 各開自己的連線，由 Supabase
+ * Supavisor（連接埠 6543，transaction mode）承擔真正的池化。
  * prepare: false 是 Supavisor transaction mode 的硬性要求。
  * 本機長駐時放寬到 10。
  *
- * Transaction mode 這個埠本來就是設計給「每次請求開新連線、用完即關」的
- * 短生命週期用法，不是拿來讓連線跨請求長駐重複使用。Vercel 在兩次請求
- * 之間會把整個 process 凍結，凍結期間所有計時器（包含這裡的 idle_timeout /
- * max_lifetime）都不會運作，如果凍結期間網路路徑把連線悄悄斷開（沒有任何
- * 一方在監聽，不會收到 FIN/RST），process 解凍後這條連線在程式眼中仍是
- * 「活著」的，直到真的送出查詢才會發現對方沒反應——而且往往永遠等不到
- * 明確的錯誤，只會無限卡住。所以 serverless 環境下不嘗試沿用舊連線，改成
- * 每個 HTTP 請求一開始就呼叫 resetConnection() 換一條保證沒跨越過凍結期間
- * 的全新連線（見 app.ts 的中介層）；這裡的 idle_timeout / max_lifetime 只當
- * 保底，不是主要防線。
+ * 連線在 warm instance 之間重複使用（不像先前版本每個請求都強制換新連線）。
+ * 曾經為了防「process 凍結期間連線悄悄斷線」而改成每請求都換新連線，
+ * 但那個做法讓連線數暴增：每個請求各開最多 5 條全新連線，舊連線關閉時
+ * 又不設逾時、無限期等待既有查詢結束，一旦某條連線卡住，它就永遠不會
+ * 真的被回收，連線數只增不減，最終把 Supavisor 的連線額度卡滿，變成
+ * 「不管哪個查詢量大的頁面，輪到的那個就卡 15 秒」。改回重複使用連線，
+ * 只在偵測到真的卡住時才呼叫 resetConnection()（見下方），避免無謂的
+ * 連線churn。
  */
 export const serverless = Boolean(process.env.VERCEL);
 
@@ -52,19 +50,20 @@ let currentDb = drizzle(currentSql, { schema });
  * 指向的 client 換掉後，下一次查詢就會自動用到新連線。
  * 舊連線背景關閉、不等待，避免它本身的關閉卡住新連線生效。
  *
- * 關閉時刻意不給短 timeout 強制砸斷：這條連線上可能還有查詢正在跑
+ * 關閉時給 20 秒的優雅期、不是立刻強殺：這條連線上可能還有查詢正在跑
  * （同一個 warm instance 上並發的其他請求，或這次逾時之前就已送出、
- * 仍在背景等待的那個查詢），強制 terminate 會讓那些查詢直接收到
- * CONNECTION_DESTROYED 而爆掉，變成使用者看到的 500，而不是我們設計
- * 中乾淨的 503。不傳 timeout 讓 postgres.js 優雅等待既有查詢自然結束
- * 再關閉；真正掛死的連線本來就不會再有新查詢送進來，多留一陣子也
- * 沒有實質壞處，最終會被 Supavisor 自己的 idle timeout 回收。
+ * 仍在背景等待的那個查詢），太短的 timeout 強制 terminate 會讓那些查詢
+ * 直接收到 CONNECTION_DESTROYED 而爆掉，變成使用者看到的 500，而不是
+ * 我們設計中乾淨的 503。20 秒比 app.ts 的 15 秒應用層逾時長，給正常
+ * 查詢足夠時間跑完；但也不是完全不設上限——真的卡死的連線 20 秒後
+ * 還是會被強制回收，不會無限期占著連線數，這是先前「不設 timeout」
+ * 版本的教訓：卡死的查詢永遠不結束，連線就永遠不會真的關閉。
  */
 export function resetConnection() {
   const dying = currentSql;
   currentSql = createClient();
   currentDb = drizzle(currentSql, { schema });
-  dying.end().catch(() => {});
+  dying.end({ timeout: 20 }).catch(() => {});
 }
 
 function bindIfFn(value: unknown, thisArg: unknown) {
