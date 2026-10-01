@@ -10,6 +10,27 @@ import { intSum, notFuture, onlyFuture, toView, transactionViewQuery } from "./v
 const RECENT_PER_CATEGORY = 3;
 const RECENT_OVERALL = 8;
 
+/**
+ * 暫時的診斷用計時器：首頁儀表板在修完查詢量跟跨區延遲後仍會整支卡到
+ * 15 秒逾時，代表卡住的是某個具體的查詢在真的沒有回應，不是單純變慢。
+ * 用這個包住每一支查詢，下次卡住時 Vercel function log 會直接顯示
+ * 哪一支「start」了卻沒有對應的「done」，不用再憑感覺猜。確認原因後
+ * 這段 log 就可以拿掉。
+ */
+function timed<T>(label: string, promise: Promise<T>): Promise<T> {
+  const startedAt = Date.now();
+  console.log("[dashboard] start " + label);
+  return promise
+    .then((result) => {
+      console.log("[dashboard] done  " + label + " (" + (Date.now() - startedAt) + "ms)");
+      return result;
+    })
+    .catch((err) => {
+      console.log("[dashboard] fail  " + label + " (" + (Date.now() - startedAt) + "ms)");
+      throw err;
+    });
+}
+
 /** 儀表板單頁需跨 4 張表，後端一次算完回傳，前端不再組合。 */
 export async function buildDashboard(month: string): Promise<DashboardPayload> {
   const { start, end } = monthRange(month);
@@ -21,28 +42,40 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
 
   const [totals, byCategory, scheduledByCategory, scheduledTotal, monthBudgets, categories, fixed, monthRows] =
     await Promise.all([
-      db
-        .select({ type: transactions.type, amount: intSum(transactions.amount) })
-        .from(transactions)
-        .where(settled)
-        .groupBy(transactions.type),
-      db
-        .select({ mainCategoryId: transactions.mainCategoryId, amount: intSum(transactions.amount) })
-        .from(transactions)
-        .where(and(settled, eq(transactions.type, "expense")))
-        .groupBy(transactions.mainCategoryId),
-      db
-        .select({ mainCategoryId: transactions.mainCategoryId, amount: intSum(transactions.amount) })
-        .from(transactions)
-        .where(and(scheduled, eq(transactions.type, "expense")))
-        .groupBy(transactions.mainCategoryId),
-      db
-        .select({ amount: intSum(transactions.amount) })
-        .from(transactions)
-        .where(and(scheduled, eq(transactions.type, "expense"))),
-      db.select().from(budgets).where(eq(budgets.month, month)),
-      listCategories(true),
-      fixedTotal(month),
+      timed(
+        "totals",
+        db
+          .select({ type: transactions.type, amount: intSum(transactions.amount) })
+          .from(transactions)
+          .where(settled)
+          .groupBy(transactions.type)
+      ),
+      timed(
+        "byCategory",
+        db
+          .select({ mainCategoryId: transactions.mainCategoryId, amount: intSum(transactions.amount) })
+          .from(transactions)
+          .where(and(settled, eq(transactions.type, "expense")))
+          .groupBy(transactions.mainCategoryId)
+      ),
+      timed(
+        "scheduledByCategory",
+        db
+          .select({ mainCategoryId: transactions.mainCategoryId, amount: intSum(transactions.amount) })
+          .from(transactions)
+          .where(and(scheduled, eq(transactions.type, "expense")))
+          .groupBy(transactions.mainCategoryId)
+      ),
+      timed(
+        "scheduledTotal",
+        db
+          .select({ amount: intSum(transactions.amount) })
+          .from(transactions)
+          .where(and(scheduled, eq(transactions.type, "expense")))
+      ),
+      timed("monthBudgets", db.select().from(budgets).where(eq(budgets.month, month))),
+      timed("categories", listCategories(true)),
+      timed("fixedTotal", fixedTotal(month)),
       /**
        * 一次抓整月交易（含預定支出），下面同時導出「整體最近交易」與
        * 「各分類最近交易」，不再對每個分類各發一支查詢。家用記帳單月
@@ -50,7 +83,10 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
        * 查詢，加上這裡原本就有的 6～7 支，單次首頁載入平行查詢數會超過
        * 連線池上限（max: 5），多出來的查詢要排隊，才會不時卡到逾時。
        */
-      transactionViewQuery().where(inMonth).orderBy(desc(transactions.date), desc(transactions.id)),
+      timed(
+        "monthRows",
+        transactionViewQuery().where(inMonth).orderBy(desc(transactions.date), desc(transactions.id))
+      ),
     ]);
   const recentRows = monthRows.slice(0, RECENT_OVERALL);
 

@@ -38,7 +38,8 @@ app.get("/health", (c) => c.json({ ok: true }));
  * 會各自獨立握手，彼此不影響；換下來的舊連線在背景優雅關閉，不強殺。
  */
 if (serverless) {
-  app.use("/api/*", async (_c, next) => {
+  app.use("/api/*", async (c, next) => {
+    console.log("[conn] reset at request start: " + c.req.path);
     resetConnection();
     await next();
   });
@@ -78,6 +79,7 @@ app.use("/api/*", async (c, next) => {
 
   const result = await Promise.race([running, timedOut]);
   if (result === "timeout" && !finished) {
+    console.log("[conn] timeout fired: " + c.req.path);
     resetConnection();
     if (!c.finalized) {
       return c.json({ code: "gateway_timeout", message: "伺服器忙碌，請重試一次" }, 503);
