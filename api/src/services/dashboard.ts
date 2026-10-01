@@ -1,18 +1,11 @@
 import { and, desc, eq, gte, lt } from "drizzle-orm";
-import type { CategoryProgress, DashboardPayload, MonthSummary } from "@family-ledger/shared";
+import type { CategoryProgress, DashboardPayload, MonthSummary, TransactionView } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { budgets, transactions } from "../db/schema.js";
 import { existsInMonth, monthRange } from "../lib/dates.js";
 import { listCategories } from "./categories.js";
 import { fixedTotal } from "./fixed.js";
-import {
-  intSum,
-  notFuture,
-  onlyFuture,
-  recentByCategory,
-  toView,
-  transactionViewQuery,
-} from "./views.js";
+import { intSum, notFuture, onlyFuture, toView, transactionViewQuery } from "./views.js";
 
 const RECENT_PER_CATEGORY = 3;
 const RECENT_OVERALL = 8;
@@ -26,7 +19,7 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
   const settled = and(inMonth, notFuture());
   const scheduled = and(inMonth, onlyFuture());
 
-  const [totals, byCategory, scheduledByCategory, scheduledTotal, monthBudgets, categories, fixed, recentRows] =
+  const [totals, byCategory, scheduledByCategory, scheduledTotal, monthBudgets, categories, fixed, monthRows] =
     await Promise.all([
       db
         .select({ type: transactions.type, amount: intSum(transactions.amount) })
@@ -50,12 +43,16 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
       db.select().from(budgets).where(eq(budgets.month, month)),
       listCategories(true),
       fixedTotal(month),
-      // 最近交易仍包含預定支出，讓使用者看得到自己排了什麼
-      transactionViewQuery()
-        .where(inMonth)
-        .orderBy(desc(transactions.date), desc(transactions.id))
-        .limit(RECENT_OVERALL),
+      /**
+       * 一次抓整月交易（含預定支出），下面同時導出「整體最近交易」與
+       * 「各分類最近交易」，不再對每個分類各發一支查詢。家用記帳單月
+       * 交易量很小，一次抓全部比分開查詢便宜很多——原本每個分類各一支
+       * 查詢，加上這裡原本就有的 6～7 支，單次首頁載入平行查詢數會超過
+       * 連線池上限（max: 5），多出來的查詢要排隊，才會不時卡到逾時。
+       */
+      transactionViewQuery().where(inMonth).orderBy(desc(transactions.date), desc(transactions.id)),
     ]);
+  const recentRows = monthRows.slice(0, RECENT_OVERALL);
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;
   const expense = totals.find((t) => t.type === "expense")?.amount ?? 0;
@@ -77,17 +74,25 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
     (c) => c.type === "expense" && c.nature === "floating" && existsInMonth(c, month)
   );
 
-  const progress: CategoryProgress[] = await Promise.all(
-    visible.map(async (c) => ({
-      id: c.id,
-      name: c.name,
-      icon: c.icon,
-      budget: budgetMap.get(c.id) ?? null,
-      spent: spentMap.get(c.id) ?? 0,
-      scheduled: scheduledMap.get(c.id) ?? 0,
-      recent: await recentByCategory(c.id, start, end, RECENT_PER_CATEGORY),
-    }))
-  );
+  /** monthRows 已依日期新到舊排序，逐筆分桶即為各分類的「最近交易」。 */
+  const recentByCategoryMap = new Map<number, TransactionView[]>();
+  for (const row of monthRows) {
+    const view = toView(row);
+    if (view.mainCategoryId == null) continue;
+    const list = recentByCategoryMap.get(view.mainCategoryId) ?? [];
+    if (list.length < RECENT_PER_CATEGORY) list.push(view);
+    recentByCategoryMap.set(view.mainCategoryId, list);
+  }
+
+  const progress: CategoryProgress[] = visible.map((c) => ({
+    id: c.id,
+    name: c.name,
+    icon: c.icon,
+    budget: budgetMap.get(c.id) ?? null,
+    spent: spentMap.get(c.id) ?? 0,
+    scheduled: scheduledMap.get(c.id) ?? 0,
+    recent: recentByCategoryMap.get(c.id) ?? [],
+  }));
 
   return { summary, categories: progress, recent: recentRows.map(toView) };
 }

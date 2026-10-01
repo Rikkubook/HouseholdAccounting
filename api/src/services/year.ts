@@ -2,7 +2,7 @@ import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { YearCategoryRow, YearSummaryPayload } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { budgets, mainCategories, members, transactions, yearExtraExpenses } from "../db/schema.js";
-import { existsInMonth, yearRange } from "../lib/dates.js";
+import { currentMonth, existsInMonth, yearRange } from "../lib/dates.js";
 import { listCategories } from "./categories.js";
 import { countAll, intSum, notFuture } from "./views.js";
 
@@ -79,6 +79,8 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
   const extraByCat = new Map<number, number>();
   for (const e of extras) extraByCat.set(e.mainCategoryId, (extraByCat.get(e.mainCategoryId) ?? 0) + e.amount);
 
+  const nowMonth = currentMonth();
+
   const rows: YearCategoryRow[] = categories
     .filter((c) => c.type === "expense")
     .map((cat) => {
@@ -91,15 +93,32 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
         i < startMonth || i >= endMonth ? null : (cellMap.get(cat.id + "|" + m) ?? null)
       );
 
-      // 該年度最後一次設定的月預算，作為預估基準
+      // 該年度最後一次設定的月預算，作為未來月份的預估基準
       const catBudgets = budgetRows
         .filter((b) => b.mainCategoryId === cat.id && existsInMonth(cat, b.month))
         .sort((a, b) => a.month.localeCompare(b.month));
       const monthlyBudget = catBudgets.at(-1)?.amount ?? 0;
+      const budgetByMonth = new Map(catBudgets.map((b) => [b.month, b.amount]));
 
-      const monthsExisting = startMonth < 0 ? 0 : endMonth - startMonth;
       const extra = extraByCat.get(cat.id) ?? null;
       const recorded = cells.reduce<number>((sum, v) => sum + (v ?? 0), 0);
+
+      /**
+       * 已經過去的月份：加總「當時實際設定」的預算金額（月中若調整過金額，
+       * 反映調整後的真實目標，未設定的月份視為 0）；還沒到的月份：用目前
+       * 的月預算往後推算。兩段加起來才是年度預計。
+       */
+      let elapsedBudget = 0;
+      let remainingMonths = 0;
+      months.forEach((m, i) => {
+        if (i < startMonth || i >= endMonth) return; // 分類當月不存在，不計入
+        if (m < nowMonth) elapsedBudget += budgetByMonth.get(m) ?? 0;
+        else remainingMonths += 1;
+      });
+      const planned =
+        monthlyBudget > 0 || elapsedBudget > 0
+          ? elapsedBudget + monthlyBudget * remainingMonths + (extra ?? 0)
+          : null;
 
       return {
         mainCategoryId: cat.id,
@@ -108,7 +127,7 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
         months: cells,
         extra,
         total: recorded + (extra ?? 0),
-        planned: monthlyBudget > 0 ? monthlyBudget * monthsExisting + (extra ?? 0) : null,
+        planned,
         monthlyBudget,
         startMonth: startMonth < 0 ? 0 : startMonth,
         endMonth: startMonth < 0 ? 0 : endMonth,
