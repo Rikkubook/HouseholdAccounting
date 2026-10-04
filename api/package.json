@@ -8,27 +8,31 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "db:push": "tsx src/db/push.ts",
-    "db:seed": "tsx src/db/seed.ts"
+    "db:seed": "tsx src/db/seed.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@family-ledger/shared": "workspace:*",
     "@hono/node-server": "^1.13.7",
     "@hono/swagger-ui": "^0.5.0",
     "@hono/zod-validator": "^0.4.1",
-    "zod-to-json-schema": "^3.24.1",
     "@node-rs/argon2": "^2.0.2",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.36.4",
     "hono": "^4.6.13",
     "jose": "^5.9.6",
     "postgres": "^3.4.5",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.1"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
-    "drizzle-kit": "^0.28.1",
-    "tsx": "^4.19.2",
     "@vercel/node": "^5.0.0",
-    "typescript": "^5.7.2"
+    "drizzle-kit": "^0.28.1",
+    "embedded-postgres": "17.10.0-beta.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^5.0.3"
   }
 }

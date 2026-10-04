@@ -3,5 +3,6 @@ packages:
   - "api"
   - "vue3"
 allowBuilds:
+  '@embedded-postgres/windows-x64': true
   esbuild: true
   vue-demi: true

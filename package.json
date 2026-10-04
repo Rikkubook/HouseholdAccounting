@@ -9,6 +9,7 @@
     "start": "pnpm --filter @family-ledger/api start",
     "typecheck": "pnpm --filter @family-ledger/api typecheck",
     "db:push": "pnpm --filter @family-ledger/api db:push",
-    "db:seed": "pnpm --filter @family-ledger/api db:seed"
+    "db:seed": "pnpm --filter @family-ledger/api db:seed",
+    "test": "pnpm --filter @family-ledger/api test"
   }
 }
