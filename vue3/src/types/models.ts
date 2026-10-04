@@ -36,8 +36,10 @@ export interface MainCategory {
   nature: CategoryNature | null;
   sortOrder: number;
   isActive: boolean;
-  /** 系統保留（其他）：不可停用、不可改名 */
+  /** 系統保留（其他、訂閱）：不可停用、不可改名 */
   isSystem: boolean;
+  /** 系統分類識別碼：other =「其他」、subscription =「訂閱」（訂閱只能歸屬此分類） */
+  systemKey?: "other" | "subscription" | null;
   /** 啟用年月 YYYY-MM，null 表示自始存在 */
   activeFrom: string | null;
   /** 停用年月 YYYY-MM，null 表示仍啟用 */

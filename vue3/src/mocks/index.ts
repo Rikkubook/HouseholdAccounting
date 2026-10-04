@@ -93,7 +93,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/categories\/(\d+)\/archive$/, "post", (m) => {
     const cat = db.categories.find((c) => c.id === Number(m[1]))!;
-    if (cat.isSystem) throw { code: "system_category", message: "「其他」為系統保留分類，不可停用" };
+    if (cat.isSystem) throw { code: "system_category", message: "系統保留分類不可停用" };
     cat.isActive = false;
     cat.archivedFrom = new Date().toISOString().slice(0, 7);
     return cat;
@@ -216,7 +216,9 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   // ── subscriptions ─────────────────────────────────────
   [/^\/subscriptions$/, "get", () => db.subscriptions],
   [/^\/subscriptions$/, "post", (_m, body) => {
-    const s: Subscription = { id: ++seq, isActive: true, ...body };
+    // 訂閱一律歸屬系統分類「訂閱」，與後端一致
+    const subscriptionCat = db.categories.find((c) => c.systemKey === "subscription")!;
+    const s: Subscription = { id: ++seq, isActive: true, ...body, mainCategoryId: subscriptionCat.id };
     db.subscriptions.push(s);
     return s;
   }],

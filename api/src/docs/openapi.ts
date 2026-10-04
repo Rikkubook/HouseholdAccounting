@@ -603,7 +603,7 @@ export const openApiDocument = {
       post: {
         tags: ["subscriptions"],
         summary: "新增訂閱",
-        description: ADMIN,
+        description: ADMIN + "\n\n訂閱一律歸屬系統分類「訂閱」，由後端填入，不接受前端傳 `mainCategoryId`。",
         requestBody: { required: true, ...json(ref("SubscriptionDraft")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors },
       },

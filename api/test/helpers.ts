@@ -1,3 +1,5 @@
+import { execFileSync } from "node:child_process";
+import { join, resolve } from "node:path";
 import { vi } from "vitest";
 import { app } from "../src/app.js";
 import { signToken } from "../src/lib/auth.js";
@@ -48,4 +50,14 @@ export async function api<T = unknown>(
   });
   const text = await res.text();
   return { status: res.status, body: (text ? JSON.parse(text) : null) as T };
+}
+
+/**
+ * 重新跑 seed，把資料庫還原成初始狀態。會寫入資料的測試檔在 afterAll 呼叫，
+ * 讓其他測試檔（例如快照）不受執行順序影響。
+ */
+export function reseed() {
+  const apiRoot = resolve(import.meta.dirname, "..");
+  const tsx = join(apiRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  execFileSync(process.execPath, [tsx, "src/db/seed.ts"], { cwd: apiRoot, env: process.env, stdio: "pipe" });
 }

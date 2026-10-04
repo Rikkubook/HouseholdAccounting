@@ -38,9 +38,9 @@ const categorySeed = [
   { id: 6, name: "育樂", icon: "sports_esports", type: "expense", nature: "floating", isSystem: false, activeFrom: null, archivedFrom: null, isActive: true, subs: ["電影", "旅遊", "聚餐", "書籍"] },
   { id: 7, name: "教育", icon: "school", type: "expense", nature: "floating", isSystem: false, activeFrom: "2026-08", archivedFrom: null, isActive: true, subs: ["才藝課", "教材", "文具"] },
   { id: 8, name: "保險", icon: "shield", type: "expense", nature: "fixed", isSystem: false, activeFrom: null, archivedFrom: null, isActive: true, subs: ["壽險", "車險"] },
-  { id: 9, name: "訂閱", icon: "autorenew", type: "expense", nature: "fixed", isSystem: false, activeFrom: null, archivedFrom: null, isActive: true, subs: ["影音", "音樂", "雲端"] },
+  { id: 9, name: "訂閱", icon: "autorenew", type: "expense", nature: "fixed", isSystem: true, systemKey: "subscription", activeFrom: null, archivedFrom: null, isActive: true, subs: [] },
   { id: 10, name: "薪資", icon: "payments", type: "income", nature: null, isSystem: false, activeFrom: null, archivedFrom: null, isActive: true, subs: ["本薪", "獎金"] },
-  { id: 11, name: "其他", icon: "category", type: "expense", nature: "floating", isSystem: true, activeFrom: null, archivedFrom: null, isActive: true, subs: [] },
+  { id: 11, name: "其他", icon: "category", type: "expense", nature: "floating", isSystem: true, systemKey: "other", activeFrom: null, archivedFrom: null, isActive: true, subs: [] },
 ] as const;
 
 const budgetSeed = [
@@ -60,9 +60,9 @@ const subscriptionSeed = [
   { id: 1, name: "影音串流", amount: 390, cycle: "monthly", nextChargeDate: "2026-09-10", mainCategoryId: 9, payerId: 1, isActive: true },
   { id: 2, name: "音樂訂閱", amount: 180, cycle: "monthly", nextChargeDate: "2026-09-08", mainCategoryId: 9, payerId: 2, isActive: true },
   { id: 3, name: "雲端空間", amount: 90, cycle: "monthly", nextChargeDate: "2026-09-12", mainCategoryId: 9, payerId: 1, isActive: true },
-  { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 5, payerId: 2, isActive: true },
-  { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 6, payerId: 1, isActive: true },
-  { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 6, payerId: 2, isActive: false },
+  { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 9, payerId: 2, isActive: true },
+  { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 9, payerId: 1, isActive: true },
+  { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 9, payerId: 2, isActive: false },
 ] as const;
 
 const yearExtraSeed = [
@@ -91,6 +91,7 @@ await db.insert(mainCategories).values(
     sortOrder: i + 1,
     isActive: c.isActive,
     isSystem: c.isSystem,
+    systemKey: "systemKey" in c ? c.systemKey : null,
     activeFrom: c.activeFrom,
     archivedFrom: c.archivedFrom,
   }))

@@ -37,6 +37,8 @@ export const mainCategories = pgTable("main_categories", {
   isActive: boolean("is_active").notNull().default(true),
   /** 系統保留「其他」：不可停用、不可改名 */
   isSystem: boolean("is_system").notNull().default(false),
+  /** 系統分類識別碼：other =「其他」、subscription =「訂閱」（訂閱只能歸屬此分類） */
+  systemKey: text("system_key", { enum: ["other", "subscription"] }),
   /** 啟用年月 YYYY-MM，null = 自始存在 */
   activeFrom: char("active_from", { length: 7 }),
   /** 停用年月 YYYY-MM，null = 仍啟用 */

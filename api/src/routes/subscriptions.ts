@@ -38,13 +38,14 @@ subscriptionRoutes.get("/", async (c) => {
 
 subscriptionRoutes.post("/", requireAdmin, zValidator("json", subscriptionDraftSchema), async (c) => {
   const draft = c.req.valid("json");
-  await assertRefs(draft.mainCategoryId, draft.payerId);
+  await assertPayer(draft.payerId);
+  const mainCategoryId = await subscriptionCategoryId();
 
   const row = await db.transaction(async (tx) => {
     // chargeDay 取首次扣款日的日數，作為之後推算的錨點
     const [created] = await tx
       .insert(subscriptions)
-      .values({ ...draft, chargeDay: Number(draft.nextChargeDate.slice(8, 10)) })
+      .values({ ...draft, mainCategoryId, chargeDay: Number(draft.nextChargeDate.slice(8, 10)) })
       .returning();
     // 建立時即寫入第一個版本，供固定支出逐月回推
     await tx.insert(subscriptionRevisions).values({
@@ -66,9 +67,7 @@ subscriptionRoutes.patch("/:id", requireAdmin, idParam, zValidator("json", subsc
 
   const [current] = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
   if (!current) throw notFound("訂閱不存在");
-  if (patch.mainCategoryId || patch.payerId) {
-    await assertRefs(patch.mainCategoryId ?? current.mainCategoryId, patch.payerId ?? current.payerId);
-  }
+  if (patch.payerId) await assertPayer(patch.payerId);
 
   const nextAmount = patch.amount ?? current.amount;
   const nextCycle = patch.cycle ?? current.cycle;
@@ -140,10 +139,21 @@ subscriptionRoutes.get("/:id/revisions", idParam, async (c) => {
   return c.json<SubscriptionRevision[]>(rows);
 });
 
-async function assertRefs(mainCategoryId: number, payerId: number): Promise<void> {
-  const [cat] = await db.select().from(mainCategories).where(eq(mainCategories.id, mainCategoryId)).limit(1);
-  if (!cat || cat.type !== "expense") throw badRequest("訂閱只能歸屬支出分類");
+/**
+ * 訂閱一律歸屬系統分類「訂閱」（sql/0001）：它不可停用，
+ * 所以不會發生「分類停用了、訂閱還在扣款與攤提」的情況。
+ */
+async function subscriptionCategoryId(): Promise<number> {
+  const [cat] = await db
+    .select({ id: mainCategories.id })
+    .from(mainCategories)
+    .where(eq(mainCategories.systemKey, "subscription"))
+    .limit(1);
+  if (!cat) throw new Error("找不到系統分類「訂閱」，請先執行 db:push");
+  return cat.id;
+}
 
+async function assertPayer(payerId: number): Promise<void> {
   const [payer] = await db.select().from(members).where(eq(members.id, payerId)).limit(1);
   if (!payer || !payer.isActive) throw badRequest("扣款人不存在或已停用");
 }

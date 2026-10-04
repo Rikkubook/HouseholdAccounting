@@ -77,6 +77,8 @@ export const mainCategorySchema = z.object({
   sortOrder: z.number().int(),
   isActive: z.boolean(),
   isSystem: z.boolean(),
+  /** 系統分類識別碼：other =「其他」、subscription =「訂閱」 */
+  systemKey: z.enum(["other", "subscription"]).nullable(),
   activeFrom: z.string().nullable(),
   archivedFrom: z.string().nullable(),
   subCategories: z.array(subCategorySchema),
@@ -240,7 +242,7 @@ export const subscriptionDraftSchema = z.object({
   amount: amountSchema,
   cycle: billingCycleSchema,
   nextChargeDate: dateSchema,
-  mainCategoryId: z.number().int().positive(),
+  // 不接受 mainCategoryId：訂閱一律歸屬系統分類「訂閱」，由後端填入
   payerId: z.number().int().positive(),
 });
 

@@ -67,8 +67,8 @@ export const categories: MainCategory[] = [
   },
   {
     id: 9, name: "訂閱", icon: "autorenew", type: "expense", nature: "fixed", sortOrder: 9,
-    isActive: true, isSystem: false, activeFrom: null, archivedFrom: null,
-    subCategories: [sub(9, "影音", 1), sub(9, "音樂", 2), sub(9, "雲端", 3)],
+    isActive: true, isSystem: true, systemKey: "subscription", activeFrom: null, archivedFrom: null,
+    subCategories: [],
   },
   {
     id: 10, name: "薪資", icon: "payments", type: "income", nature: null, sortOrder: 10,
@@ -77,7 +77,7 @@ export const categories: MainCategory[] = [
   },
   {
     id: 11, name: "其他", icon: "category", type: "expense", nature: "floating", sortOrder: 11,
-    isActive: true, isSystem: true, activeFrom: null, archivedFrom: null, subCategories: [],
+    isActive: true, isSystem: true, systemKey: "other", activeFrom: null, archivedFrom: null, subCategories: [],
   },
 ];
 
@@ -99,9 +99,9 @@ export const subscriptions: Subscription[] = [
   { id: 1, name: "影音串流", amount: 390, cycle: "monthly", nextChargeDate: "2026-09-10", mainCategoryId: 9, payerId: 1, isActive: true },
   { id: 2, name: "音樂訂閱", amount: 180, cycle: "monthly", nextChargeDate: "2026-09-08", mainCategoryId: 9, payerId: 2, isActive: true },
   { id: 3, name: "雲端空間", amount: 90, cycle: "monthly", nextChargeDate: "2026-09-12", mainCategoryId: 9, payerId: 1, isActive: true },
-  { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 5, payerId: 2, isActive: true },
-  { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 6, payerId: 1, isActive: true },
-  { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 6, payerId: 2, isActive: false },
+  { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 9, payerId: 2, isActive: true },
+  { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 9, payerId: 1, isActive: true },
+  { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 9, payerId: 2, isActive: false },
 ];
 
 export const yearExtras: YearExtraExpense[] = [

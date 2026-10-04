@@ -6,7 +6,7 @@ export interface SubscriptionDraft {
   amount: number;
   cycle: BillingCycle;
   nextChargeDate: string;
-  mainCategoryId: number;
+  /** 不傳分類：訂閱一律歸屬系統分類「訂閱」，由後端填入 */
   payerId: number;
 }
 

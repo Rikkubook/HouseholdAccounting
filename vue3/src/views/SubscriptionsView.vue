@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { onMounted, ref } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -31,12 +31,9 @@ interface Form {
   amount: string;
   cycle: BillingCycle;
   nextChargeDate: string;
-  mainCategoryId: number;
   payerId: number;
 }
 const form = ref<Form | null>(null);
-
-const categoryOptions = computed(() => cats.selectable.filter((c) => c.type === "expense"));
 
 function openNew() {
   form.value = {
@@ -44,7 +41,6 @@ function openNew() {
     amount: "",
     cycle: "monthly",
     nextChargeDate: todayISO(),
-    mainCategoryId: categoryOptions.value[0]?.id ?? 1,
     payerId: members.active[0]?.id ?? 1,
   };
 }
@@ -56,7 +52,6 @@ function openEdit(sub: Subscription) {
     amount: String(sub.amount),
     cycle: sub.cycle,
     nextChargeDate: sub.nextChargeDate,
-    mainCategoryId: sub.mainCategoryId,
     payerId: sub.payerId,
   };
 }
@@ -71,7 +66,6 @@ async function submit() {
     amount: Number(v.amount),
     cycle: v.cycle,
     nextChargeDate: v.nextChargeDate,
-    mainCategoryId: v.mainCategoryId,
     payerId: v.payerId,
   };
   if (v.id) {
@@ -94,8 +88,6 @@ async function markPaid(sub: Subscription) {
       " 產生交易 " +
       money(sub.amount) +
       "（" +
-      (cats.byId(sub.mainCategoryId)?.name ?? "") +
-      " · " +
       members.nameOf(sub.payerId) +
       "），下次扣款 " +
       shortDate(next.nextChargeDate)
@@ -213,14 +205,7 @@ onMounted(async () => {
           />
         </FormField>
 
-        <FormField label="歸屬分類">
-          <select
-            v-model.number="form.mainCategoryId"
-            class="h-[46px] px-2.5 rounded-lg border border-strong bg-surface text-[15px] text-fg-1 outline-none box-border w-full"
-          >
-            <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
-          </select>
-        </FormField>
+        <p class="m-0 text-[11.5px] text-fg-3">訂閱一律歸屬「訂閱」分類，停用後攤提到已繳期間結束</p>
       </template>
 
       <template #footer>
