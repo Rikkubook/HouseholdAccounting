@@ -17,6 +17,7 @@ import { badRequest, forbidden, notFound } from "../lib/errors.js";
 import { monthRange } from "../lib/dates.js";
 import { requireAuth, type AppEnv } from "../middleware/auth.js";
 import { findView, toView, transactionViewQuery } from "../services/views.js";
+import { txScope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 
@@ -29,6 +30,7 @@ transactionRoutes.get("/", zValidator("query", transactionQuerySchema), async (c
 
   const where = and(
     eq(transactions.isDeleted, false),
+    txScope(),
     range ? gte(transactions.date, range.start) : undefined,
     range ? lt(transactions.date, range.end) : undefined,
     q.type !== "all" ? eq(transactions.type, q.type) : undefined,

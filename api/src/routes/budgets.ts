@@ -9,6 +9,7 @@ import { badRequest } from "../lib/errors.js";
 import { existsInMonth, prevMonth } from "../lib/dates.js";
 import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
 import { fixedTotal } from "../services/fixed.js";
+import { budgetScope, categoryScope } from "../services/scope.js";
 
 export const budgetRoutes = new Hono<AppEnv>();
 
@@ -20,7 +21,7 @@ budgetRoutes.get("/", zValidator("query", z.object({ month: monthSchema })), asy
   const rows = await db
     .select()
     .from(budgets)
-    .where(eq(budgets.month, month))
+    .where(and(eq(budgets.month, month), budgetScope()))
     .orderBy(asc(budgets.mainCategoryId));
   return c.json<Budget[]>(rows);
 });
@@ -62,8 +63,8 @@ budgetRoutes.post("/copy-previous", requireAdmin, zValidator("json", z.object({ 
   const source = prevMonth(month);
 
   const [previous, categories] = await Promise.all([
-    db.select().from(budgets).where(eq(budgets.month, source)),
-    db.select().from(mainCategories),
+    db.select().from(budgets).where(and(eq(budgets.month, source), budgetScope())),
+    db.select().from(mainCategories).where(categoryScope()),
   ]);
 
   const catMap = new Map(categories.map((cat) => [cat.id, cat]));
@@ -84,7 +85,7 @@ budgetRoutes.post("/copy-previous", requireAdmin, zValidator("json", z.object({ 
   const result = await db
     .select()
     .from(budgets)
-    .where(eq(budgets.month, month))
+    .where(and(eq(budgets.month, month), budgetScope()))
     .orderBy(asc(budgets.mainCategoryId));
 
   return c.json<Budget[]>(result);

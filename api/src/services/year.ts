@@ -1,10 +1,11 @@
-import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { YearCategoryRow, YearSummaryPayload } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { budgets, mainCategories, members, transactions, yearExtraExpenses } from "../db/schema.js";
 import { currentMonth, existsInMonth, yearRange } from "../lib/dates.js";
 import { timed } from "../lib/timed.js";
 import { listCategories } from "./categories.js";
+import { budgetScope, txScope, yearExtraScope } from "./scope.js";
 import { countAll, intSum, notFuture } from "./views.js";
 
 /** 年度額外支出不分攤到個別月份，只計入 extra 與 total。 */
@@ -13,6 +14,7 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
   const months = Array.from({ length: 12 }, (_, i) => year + "-" + String(i + 1).padStart(2, "0"));
   const inYear = and(
     eq(transactions.isDeleted, false),
+    txScope(),
     gte(transactions.date, start),
     lt(transactions.date, end),
     // 未來日期不計入年度彙整
@@ -44,7 +46,7 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
           .groupBy(transactions.type)
       ),
       timed("year.monthsWithData", db.selectDistinct({ month: monthExpr }).from(transactions).where(inYear)),
-      timed("year.budgetRows", db.select().from(budgets).where(inArray(budgets.month, months))),
+      timed("year.budgetRows", db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope()))),
       timed("year.categories", listCategories(true)),
       timed(
         "year.extras",
@@ -62,7 +64,9 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
           .from(yearExtraExpenses)
           .innerJoin(mainCategories, eq(mainCategories.id, yearExtraExpenses.mainCategoryId))
           .innerJoin(members, eq(members.id, yearExtraExpenses.payerId))
-          .where(eq(yearExtraExpenses.year, year))
+          .where(and(eq(yearExtraExpenses.year, year), yearExtraScope()))
+          // 明確排序：沒有 ORDER BY 時順序取決於查詢計畫，加條件就可能變
+          .orderBy(asc(yearExtraExpenses.id))
       ),
       timed(
         "year.byMember",

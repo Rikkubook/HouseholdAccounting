@@ -1044,6 +1044,16 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
   "expense": 317460,
   "extras": [
     {
+      "amount": 86000,
+      "categoryName": "育樂",
+      "id": 1,
+      "mainCategoryId": 6,
+      "name": "日本家庭旅遊",
+      "payerId": 2,
+      "payerName": "太太",
+      "year": 2026,
+    },
+    {
       "amount": 48000,
       "categoryName": "住",
       "id": 2,
@@ -1061,16 +1071,6 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
       "name": "汽車大保養",
       "payerId": 1,
       "payerName": "先生",
-      "year": 2026,
-    },
-    {
-      "amount": 86000,
-      "categoryName": "育樂",
-      "id": 1,
-      "mainCategoryId": 6,
-      "name": "日本家庭旅遊",
-      "payerId": 2,
-      "payerName": "太太",
       "year": 2026,
     },
   ],

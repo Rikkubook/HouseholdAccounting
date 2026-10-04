@@ -2,11 +2,16 @@ import { asc, eq } from "drizzle-orm";
 import type { MainCategory } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { mainCategories, subCategories } from "../db/schema.js";
+import { categoryScope } from "./scope.js";
 
 /** 組出巢狀的 MainCategory[]（含 subCategories），排序依 sortOrder。 */
 export async function listCategories(includeArchived = true): Promise<MainCategory[]> {
   const [mains, subs] = await Promise.all([
-    db.select().from(mainCategories).orderBy(asc(mainCategories.sortOrder), asc(mainCategories.id)),
+    db
+      .select()
+      .from(mainCategories)
+      .where(categoryScope())
+      .orderBy(asc(mainCategories.sortOrder), asc(mainCategories.id)),
     db.select().from(subCategories).orderBy(asc(subCategories.sortOrder), asc(subCategories.id)),
   ]);
 

@@ -39,6 +39,8 @@ export const mainCategories = pgTable("main_categories", {
   isSystem: boolean("is_system").notNull().default(false),
   /** 系統分類識別碼：other =「其他」、subscription =「訂閱」（訂閱只能歸屬此分類） */
   systemKey: text("system_key", { enum: ["other", "subscription"] }),
+  /** 個人帳：null = 家庭分類，有值 = 該成員的個人分類（sql/0002） */
+  ownerId: integer("owner_id"),
   /** 啟用年月 YYYY-MM，null = 自始存在 */
   activeFrom: char("active_from", { length: 7 }),
   /** 停用年月 YYYY-MM，null = 仍啟用 */
@@ -75,6 +77,8 @@ export const transactions = pgTable("transactions", {
   /** 軟刪除；不計入任何統計 */
   isDeleted: boolean("is_deleted").notNull().default(false),
   sourceSubscriptionId: integer("source_subscription_id"),
+  /** 個人帳：null = 家庭帳，有值 = 該成員的個人帳，必等於 payerId（sql/0002） */
+  ownerId: integer("owner_id"),
 });
 
 export const transactionRevisions = pgTable("transaction_revisions", {

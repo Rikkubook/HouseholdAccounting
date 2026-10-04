@@ -4,6 +4,7 @@ import { db } from "../db/index.js";
 import { budgets, transactions } from "../db/schema.js";
 import { addMonths, existsInMonth, monthRange, yearRange } from "../lib/dates.js";
 import { listCategories } from "./categories.js";
+import { budgetScope, txScope } from "./scope.js";
 import { effectiveSubscriptions } from "./fixed.js";
 import { intSum, notFuture } from "./views.js";
 
@@ -21,6 +22,7 @@ export async function buildStats(
 
   const where = and(
     eq(transactions.isDeleted, false),
+    txScope(),
     eq(transactions.type, "expense"),
     gte(transactions.date, start),
     lt(transactions.date, end),
@@ -40,7 +42,7 @@ export async function buildStats(
       .where(where)
       .groupBy(transactions.mainCategoryId, transactions.subCategoryId),
     listCategories(true),
-    db.select().from(budgets).where(inArray(budgets.month, months)),
+    db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope())),
     ...months.map((m) => effectiveSubscriptions(m)),
   ]);
 
@@ -109,7 +111,7 @@ export async function earliestMonth(): Promise<string | null> {
   const [row] = await db
     .select({ month: sql<string | null>`min(to_char(${transactions.date}, 'YYYY-MM'))` })
     .from(transactions)
-    .where(eq(transactions.isDeleted, false));
+    .where(and(eq(transactions.isDeleted, false), txScope()));
   return row?.month ?? null;
 }
 

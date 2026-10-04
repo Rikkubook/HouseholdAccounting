@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
   idSchema,
@@ -23,6 +23,7 @@ import { currentMonth, monthOf } from "../lib/dates.js";
 import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
 import { findView } from "../services/views.js";
 import { chargeOnce } from "../services/charges.js";
+import { categoryScope, subscriptionScope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 
@@ -32,7 +33,11 @@ export const subscriptionRoutes = new Hono<AppEnv>();
 subscriptionRoutes.use("/*", requireAuth);
 
 subscriptionRoutes.get("/", async (c) => {
-  const rows = await db.select().from(subscriptions).orderBy(asc(subscriptions.nextChargeDate));
+  const rows = await db
+    .select()
+    .from(subscriptions)
+    .where(subscriptionScope())
+    .orderBy(asc(subscriptions.nextChargeDate));
   return c.json<Subscription[]>(rows);
 });
 
@@ -147,7 +152,7 @@ async function subscriptionCategoryId(): Promise<number> {
   const [cat] = await db
     .select({ id: mainCategories.id })
     .from(mainCategories)
-    .where(eq(mainCategories.systemKey, "subscription"))
+    .where(and(eq(mainCategories.systemKey, "subscription"), categoryScope()))
     .limit(1);
   if (!cat) throw new Error("找不到系統分類「訂閱」，請先執行 db:push");
   return cat.id;

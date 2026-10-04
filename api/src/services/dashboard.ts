@@ -5,6 +5,7 @@ import { budgets, transactions } from "../db/schema.js";
 import { existsInMonth, monthRange } from "../lib/dates.js";
 import { timed } from "../lib/timed.js";
 import { listCategories } from "./categories.js";
+import { budgetScope, txScope } from "./scope.js";
 import { fixedTotal } from "./fixed.js";
 import { intSum, notFuture, onlyFuture, toView, transactionViewQuery } from "./views.js";
 
@@ -14,7 +15,12 @@ const RECENT_OVERALL = 8;
 /** 儀表板單頁需跨 4 張表，後端一次算完回傳，前端不再組合。 */
 export async function buildDashboard(month: string): Promise<DashboardPayload> {
   const { start, end } = monthRange(month);
-  const inMonth = and(eq(transactions.isDeleted, false), gte(transactions.date, start), lt(transactions.date, end));
+  const inMonth = and(
+    eq(transactions.isDeleted, false),
+    txScope(),
+    gte(transactions.date, start),
+    lt(transactions.date, end)
+  );
 
   // 彙總只算日期已到的；未來日期另外統計為「已排定」
   const settled = and(inMonth, notFuture());
@@ -53,7 +59,7 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
           .from(transactions)
           .where(and(scheduled, eq(transactions.type, "expense")))
       ),
-      timed("dashboard.monthBudgets", db.select().from(budgets).where(eq(budgets.month, month))),
+      timed("dashboard.monthBudgets", db.select().from(budgets).where(and(eq(budgets.month, month), budgetScope()))),
       timed("dashboard.categories", listCategories(true)),
       timed("dashboard.fixedTotal", fixedTotal(month)),
       /**

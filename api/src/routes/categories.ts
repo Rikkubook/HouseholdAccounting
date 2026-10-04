@@ -16,6 +16,7 @@ import { badRequest, conflict, notFound } from "../lib/errors.js";
 import { currentMonth } from "../lib/dates.js";
 import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
 import { findCategory, listCategories } from "../services/categories.js";
+import { categoryScope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 const subIdParam = zValidator("param", z.object({ subId: idSchema }));
@@ -35,7 +36,8 @@ categoryRoutes.post("/", requireAdmin, zValidator("json", mainCategoryDraftSchem
   const draft = c.req.valid("json");
   const [{ max } = { max: 0 }] = await db
     .select({ max: sql<number>`coalesce(max(${mainCategories.sortOrder}), 0)::int` })
-    .from(mainCategories);
+    .from(mainCategories)
+    .where(categoryScope());
 
   // 新分類自建立當月起存在，之前月份的預算與統計不受影響
   const [row] = await db

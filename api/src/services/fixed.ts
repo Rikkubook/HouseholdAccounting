@@ -3,6 +3,7 @@ import type { BillingCycle } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { subscriptionRevisions, subscriptions } from "../db/schema.js";
 import { monthOf, monthlyEquivalent } from "../lib/dates.js";
+import { subscriptionScope } from "./scope.js";
 
 export interface EffectiveSubscription {
   id: number;
@@ -47,10 +48,13 @@ export async function effectiveSubscriptions(month: string): Promise<EffectiveSu
       )
     )
     .where(
-      or(
-        eq(subscriptions.isActive, true),
-        // 已停用：仍在已繳費期間內的月份繼續攤提
-        sql`to_char(${subscriptions.nextChargeDate}, 'YYYY-MM') > ${month}`
+      and(
+        subscriptionScope(),
+        or(
+          eq(subscriptions.isActive, true),
+          // 已停用：仍在已繳費期間內的月份繼續攤提
+          sql`to_char(${subscriptions.nextChargeDate}, 'YYYY-MM') > ${month}`
+        )
       )
     )
     .orderBy(desc(subscriptionRevisions.effectiveFrom), desc(subscriptionRevisions.id));
