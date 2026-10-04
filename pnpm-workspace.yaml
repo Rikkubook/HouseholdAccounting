@@ -3,6 +3,11 @@ packages:
   - "api"
   - "vue3"
 allowBuilds:
+  # 測試用的本機 PostgreSQL（只在 devDependencies）；各平台都要列，否則 pnpm 會因未核准的安裝腳本中止
+  '@embedded-postgres/darwin-arm64': true
+  '@embedded-postgres/darwin-x64': true
+  '@embedded-postgres/linux-arm64': true
+  '@embedded-postgres/linux-x64': true
   '@embedded-postgres/windows-x64': true
   esbuild: true
   vue-demi: true
