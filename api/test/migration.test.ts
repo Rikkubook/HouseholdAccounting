@@ -37,8 +37,9 @@ it("舊資料：「訂閱」設為系統分類，散落在其他分類的訂閱�
   expect(subs.every((s) => s.main_category_id === subscriptionCategoryId)).toBe(true);
 
   // 已產生的交易不動：分類名稱快照保留原樣
-  const [{ count }] = await sql`select count(*)::int as count from transactions where main_category_name = '健康'`;
-  expect(count).toBeGreaterThan(0);
+  const [snapshot] = await sql<{ count: number }[]>`
+    select count(*)::int as count from transactions where main_category_name = '健康'`;
+  expect(snapshot!.count).toBeGreaterThan(0);
 });
 
 it("沒有「訂閱」分類的資料庫會自動建立一個", async () => {
@@ -49,8 +50,8 @@ it("沒有「訂閱」分類的資料庫會自動建立一個", async () => {
 
   const rows = await sql`select name, nature, is_system from main_categories where system_key = 'subscription'`;
   expect(rows).toEqual([{ name: "訂閱", nature: "fixed", is_system: true }]);
-  const [{ moved }] = await sql`
+  const [result] = await sql<{ moved: boolean }[]>`
     select bool_and(main_category_id = (select id from main_categories where system_key = 'subscription')) as moved
       from subscriptions`;
-  expect(moved).toBe(true);
+  expect(result!.moved).toBe(true);
 });
