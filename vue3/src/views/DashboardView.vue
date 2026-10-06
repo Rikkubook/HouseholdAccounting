@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
+import { computed, onMounted } from "vue";
 import { RouterLink } from "vue-router";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
@@ -8,11 +8,9 @@ import SegmentedControl from "@/components/base/SegmentedControl.vue";
 import CategoryBudgetCard from "@/components/data/CategoryBudgetCard.vue";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { useDashboardStore } from "@/stores/dashboard";
-import { useScopeStore } from "@/stores/scope";
 import { addMonths, currentMonth, money, shortDate } from "@/utils/format";
 
 const store = useDashboardStore();
-const scope = useScopeStore();
 const thisMonth = currentMonth();
 const lastMonth = addMonths(thisMonth, -1);
 
@@ -24,13 +22,12 @@ const periodOptions = [
 const summary = computed(() => store.data?.summary);
 
 onMounted(() => store.load());
-watch(() => scope.current, () => store.load());
 </script>
 
 <template>
   <AppShell
     title="首頁儀表板"
-    :subtitle="scope.isPersonal ? '個人帳 · 本月收支與各分類的花費' : '本月收支與各浮動支出分類的預算使用狀況'"
+    subtitle="本月收支與各浮動支出分類的預算使用狀況"
     :loading="store.initialLoading"
     :error="store.error"
     @retry="store.load()"
@@ -71,17 +68,12 @@ watch(() => scope.current, () => store.load());
 
     <div class="flex items-baseline gap-2.5 mt-1">
       <h2 class="text-section font-bold text-fg-1 m-0">浮動支出分類</h2>
-      <span class="text-[11.5px] text-fg-3">{{ scope.isPersonal ? "個人預算尚未開放，只顯示已花費" : "未設預算的分類會顯示設定提示" }}</span>
+      <span class="text-[11.5px] text-fg-3">未設預算的分類會顯示設定提示</span>
     </div>
 
     <!-- 2 欄網格依分類排序自動換行，超過 6 類順勢往下 -->
     <div class="grid gap-3.5 md:grid-cols-2 md:gap-4">
-      <CategoryBudgetCard
-        v-for="c in store.data?.categories ?? []"
-        :key="c.id"
-        :category="c"
-        :hide-budget-link="scope.isPersonal"
-      />
+      <CategoryBudgetCard v-for="c in store.data?.categories ?? []" :key="c.id" :category="c" />
     </div>
 
     <AppCard pad="none">
@@ -96,7 +88,7 @@ watch(() => scope.current, () => store.load());
       >
         <span class="font-mono text-[11px] text-fg-4">{{ shortDate(tx.date) }}</span>
         <span class="text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
-        <span v-if="!scope.isPersonal" class="text-[11px] text-fg-4">{{ tx.payerName }}</span>
+        <span class="text-[11px] text-fg-4">{{ tx.payerName }}</span>
         <span class="ml-auto text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
       </div>
       <RouterLink to="/transactions" class="block px-4 py-3 text-[12px] text-brand-500 md:px-5">

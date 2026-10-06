@@ -30,23 +30,6 @@ function view(tx: Transaction): TransactionView {
 }
 
 const live = () => db.transactions.filter((t) => !t.isDeleted);
-
-/** 與後端 services/scope.ts 相同：家庭帳看 ownerId 為 null；個人帳只限管理者、只看自己的 */
-function scopedLive(scope?: string) {
-  if (scope !== "personal") return live().filter((t) => t.ownerId == null);
-  assertCanUsePersonal();
-  return live().filter((t) => t.ownerId === currentUserId);
-}
-function assertCanUsePersonal() {
-  const me = db.members.find((m) => m.id === currentUserId);
-  if (me?.role !== "admin") throw { code: "forbidden", message: "個人帳僅限管理者使用" };
-}
-/** 別人的個人帳一律當作不存在 */
-function findVisible(id: number) {
-  const tx = db.transactions.find((t) => t.id === id);
-  if (!tx || (tx.ownerId != null && tx.ownerId !== currentUserId)) throw { code: "not_found", message: "交易不存在" };
-  return tx;
-}
 const inMonth = (t: Transaction, month: string) => t.date.startsWith(month);
 const inYear = (t: Transaction, year: number) => t.date.startsWith(String(year));
 const budgetOf = (month: string, catId: number) =>
@@ -153,7 +136,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
 
   // ── transactions ──────────────────────────────────────
   [/^\/transactions$/, "get", (_m, _b, q) => {
-    let list = scopedLive(q.scope);
+    let list = live();
     if (q.month) list = list.filter((t) => inMonth(t, q.month));
     if (q.type && q.type !== "all") list = list.filter((t) => t.type === q.type);
     if (q.mainCategoryId) list = list.filter((t) => t.mainCategoryId === Number(q.mainCategoryId));
@@ -170,19 +153,17 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/transactions$/, "post", (_m, body) => {
     // 記帳者恆為登入者
-    if (body.scope === "personal") assertCanUsePersonal();
     const tx: Transaction = {
       id: ++seq, type: body.type, mainCategoryId: body.mainCategoryId,
       subCategoryId: body.subCategoryId, amount: body.amount, date: body.date,
       payerId: currentUserId, note: body.note ?? null,
       createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: null,
-      ownerId: body.scope === "personal" ? currentUserId : null,
     };
     db.transactions.push(tx);
     return view(tx);
   }],
   [/^\/transactions\/(\d+)$/, "patch", (m, body) => {
-    const tx = findVisible(Number(m[1]));
+    const tx = db.transactions.find((t) => t.id === Number(m[1]))!;
     const member = db.members.find((x) => x.id === currentUserId)!;
     if (member.role !== "admin" && tx.payerId !== currentUserId) {
       throw { code: "forbidden", message: "只能編輯自己記的交易" };
@@ -201,14 +182,12 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     return view(tx);
   }],
   [/^\/transactions\/(\d+)$/, "delete", (m) => {
-    const tx = findVisible(Number(m[1]));
+    const tx = db.transactions.find((t) => t.id === Number(m[1]))!;
     tx.isDeleted = true; // 軟刪除，前台無復原入口
     return null;
   }],
-  [/^\/transactions\/(\d+)\/revisions$/, "get", (m) => {
-    findVisible(Number(m[1]));
-    return db.revisions.filter((r) => r.transactionId === Number(m[1]));
-  }],
+  [/^\/transactions\/(\d+)\/revisions$/, "get", (m) =>
+    db.revisions.filter((r) => r.transactionId === Number(m[1]))],
 
   // ── budgets ───────────────────────────────────────────
   [/^\/budgets$/, "get", (_m, _b, q) => db.budgets.filter((b) => b.month === q.month)],
@@ -266,7 +245,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     const tx: Transaction = {
       id: ++seq, type: "expense", mainCategoryId: s.mainCategoryId, subCategoryId: null,
       amount: s.amount, date: s.nextChargeDate, payerId: s.payerId,
-      note: s.name, createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: s.id, ownerId: null,
+      note: s.name, createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: s.id,
     };
     db.transactions.push(tx);
     s.nextChargeDate = advanceCharge(s.nextChargeDate, s.cycle);
@@ -335,19 +314,17 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   // ── summary ───────────────────────────────────────────
   [/^\/summary\/dashboard$/, "get", (_m, _b, q) => {
     const month = q.month as string;
-    const personal = q.scope === "personal";
-    const rows = scopedLive(q.scope).filter((t) => inMonth(t, month));
+    const rows = live().filter((t) => inMonth(t, month));
     const income = rows.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expense = rows.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
     const floating = db.categories.filter((c) => c.type === "expense" && c.nature === "floating" && !c.isSystem);
     return {
-      // 個人帳尚無預算與訂閱
-      summary: { month, income, expense, net: income - expense, fixedTotal: personal ? 0 : fixedTotalOf() },
+      summary: { month, income, expense, net: income - expense, fixedTotal: fixedTotalOf() },
       categories: floating.map((c) => {
         const mine = rows.filter((t) => t.mainCategoryId === c.id);
         return {
           id: c.id, name: c.name, icon: c.icon,
-          budget: personal ? null : budgetOf(month, c.id),
+          budget: budgetOf(month, c.id),
           spent: mine.reduce((s, t) => s + t.amount, 0),
           recent: [...mine].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5).map(view),
         };
@@ -358,8 +335,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   [/^\/summary\/stats$/, "get", (_m, _b, q) => {
     const range = (q.range ?? "month") as "month" | "year";
     const period = q.period as string;
-    const personal = q.scope === "personal";
-    let rows = scopedLive(q.scope).filter((t) => t.type === "expense");
+    let rows = live().filter((t) => t.type === "expense");
     rows = range === "month" ? rows.filter((t) => inMonth(t, period)) : rows.filter((t) => inYear(t, Number(period)));
     if (q.payerId) rows = rows.filter((t) => t.payerId === Number(q.payerId));
     const recordedMonths = new Set(rows.map((t) => t.date.slice(0, 7))).size || 1;
@@ -367,7 +343,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     const fixed = db.categories.filter((c) => c.type === "expense" && c.nature === "fixed");
     const build = (c: MainCategory) => {
       const mine = rows.filter((t) => t.mainCategoryId === c.id);
-      const monthBudget = personal ? null : budgetOf(range === "month" ? period : period + "-08", c.id);
+      const monthBudget = budgetOf(range === "month" ? period : period + "-08", c.id);
       return {
         mainCategoryId: c.id, name: c.name, icon: c.icon,
         amount: mine.reduce((s, t) => s + t.amount, 0),
@@ -390,10 +366,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/summary\/year$/, "get", (_m, _b, q) => {
     const year = Number(q.year);
-    const personal = q.scope === "personal";
-    const rows = scopedLive(q.scope).filter((t) => inYear(t, year));
-    // 個人帳尚無年度額外支出與預算
-    const extrasOfYear = personal ? [] : db.yearExtras.filter((e) => e.year === year);
+    const rows = live().filter((t) => inYear(t, year));
     const recordedMonths = new Set(rows.map((t) => t.date.slice(5, 7))).size;
     const monthIndex = (from: string | null, fallback: number) =>
       from && from.slice(0, 4) === String(year) ? Number(from.slice(5, 7)) - 1 : fallback;
@@ -423,10 +396,10 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
             .filter((t) => t.mainCategoryId === c.id && t.date.slice(5, 7) === mm)
             .reduce((s, t) => s + t.amount, 0);
         });
-        const extra = extrasOfYear
-          .filter((e) => e.mainCategoryId === c.id)
+        const extra = db.yearExtras
+          .filter((e) => e.year === year && e.mainCategoryId === c.id)
           .reduce((s, e) => s + e.amount, 0);
-        const monthlyBudget = personal ? 0 : budgetOf(year + "-08", c.id) ?? 0;
+        const monthlyBudget = budgetOf(year + "-08", c.id) ?? 0;
         const activeMonths = Math.max(0, Math.min(endMonth, 12) - startMonth);
         return {
           mainCategoryId: c.id, name: c.name, icon: c.icon, months,
@@ -436,7 +409,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
           monthlyBudget, startMonth, endMonth,
         };
       }),
-      extras: extrasOfYear.map((e) => ({
+      extras: db.yearExtras.filter((e) => e.year === year).map((e) => ({
         ...e,
         categoryName: db.categories.find((c) => c.id === e.mainCategoryId)?.name ?? "—",
         payerName: db.members.find((m) => m.id === e.payerId)?.name ?? "—",
@@ -444,7 +417,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
       // 依每一筆交易的記帳者加總，年度額外開銷也帶記帳者一併計入
       byMember: db.members.filter((m) => m.isActive).map((m) => {
         const mine = rows.filter((t) => t.type === "expense" && t.payerId === m.id);
-        const extras = extrasOfYear.filter((e) => e.payerId === m.id);
+        const extras = db.yearExtras.filter((e) => e.year === year && e.payerId === m.id);
         return {
           memberId: m.id, name: m.name,
           amount: mine.reduce((s, t) => s + t.amount, 0) + extras.reduce((s, e) => s + e.amount, 0),

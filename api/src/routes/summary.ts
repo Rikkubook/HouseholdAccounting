@@ -5,7 +5,6 @@ import { z } from "zod";
 import {
   idSchema,
   monthSchema,
-  scopeSchema,
   statsQuerySchema,
   yearExtraDraftSchema,
   yearSchema,
@@ -18,30 +17,25 @@ import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
 import { buildDashboard } from "../services/dashboard.js";
 import { buildStats } from "../services/stats.js";
 import { buildYearSummary } from "../services/year.js";
-import { resolveScope } from "../services/scope.js";
 
 export const summaryRoutes = new Hono<AppEnv>();
 summaryRoutes.use("/*", requireAuth);
 
-const scopeQuery = { scope: scopeSchema.default("family") };
-
-summaryRoutes.get("/dashboard", zValidator("query", z.object({ month: monthSchema, ...scopeQuery })), async (c) => {
-  const { month, scope } = c.req.valid("query");
-  return c.json(await buildDashboard(month, resolveScope(c.get("user"), scope)));
-});
+summaryRoutes.get("/dashboard", zValidator("query", z.object({ month: monthSchema })), async (c) =>
+  c.json(await buildDashboard(c.req.valid("query").month))
+);
 
 summaryRoutes.get("/stats", zValidator("query", statsQuerySchema), async (c) => {
-  const { range, period, payerId, scope } = c.req.valid("query");
+  const { range, period, payerId } = c.req.valid("query");
   // range=month 需 YYYY-MM，range=year 需 YYYY
   if (range === "month" && period.length !== 7) throw badRequest("月份格式須為 YYYY-MM");
   if (range === "year" && period.length !== 4) throw badRequest("年度格式須為 YYYY");
-  return c.json(await buildStats(range, period, payerId, resolveScope(c.get("user"), scope)));
+  return c.json(await buildStats(range, period, payerId));
 });
 
-summaryRoutes.get("/year", zValidator("query", z.object({ year: yearSchema, ...scopeQuery })), async (c) => {
-  const { year, scope } = c.req.valid("query");
-  return c.json(await buildYearSummary(year, resolveScope(c.get("user"), scope)));
-});
+summaryRoutes.get("/year", zValidator("query", z.object({ year: yearSchema })), async (c) =>
+  c.json(await buildYearSummary(c.req.valid("query").year))
+);
 
 /** 年度額外支出：不分攤到個別月份，僅在年度彙整頁計入。 */
 summaryRoutes.post("/year-extras", requireAdmin, zValidator("json", yearExtraDraftSchema), async (c) => {

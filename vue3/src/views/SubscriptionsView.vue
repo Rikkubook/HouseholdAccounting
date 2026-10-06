@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
 import { onMounted, ref } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
@@ -119,7 +118,6 @@ onMounted(async () => {
     :error="store.error"
     @retry="store.load()"
   >
-    <FamilyOnlyNotice feature="訂閱" />
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNew">新增訂閱</AppButton>
     </template>

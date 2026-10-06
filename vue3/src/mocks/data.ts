@@ -148,7 +148,6 @@ function seedTransactions(): Transaction[] {
         createdAt: "2026-" + mm + "-" + day + "T09:" + String(10 + i).padStart(2, "0") + ":00Z",
         isDeleted: false,
         sourceSubscriptionId: null,
-        ownerId: null,
       });
     });
     // 每月薪資
@@ -165,7 +164,6 @@ function seedTransactions(): Transaction[] {
         createdAt: "2026-" + mm + "-05T08:00:00Z",
         isDeleted: false,
         sourceSubscriptionId: null,
-        ownerId: null,
       });
     });
   }

@@ -2,7 +2,6 @@
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
 import { NAV_ITEMS } from "@/router/nav";
-import ScopeSwitch from "@/components/layout/ScopeSwitch.vue";
 
 const route = useRoute();
 const auth = useAuthStore();
@@ -17,8 +16,6 @@ const appVersion = __APP_VERSION__;
       <div class="w-[30px] h-[30px] rounded-md bg-brand" />
       <div class="font-bold text-[15px] text-fg-1">家庭帳</div>
     </div>
-
-    <ScopeSwitch class="mx-2.5 -mt-2" />
 
     <div class="flex flex-col gap-0.5">
       <template v-for="item in NAV_ITEMS" :key="item.name">

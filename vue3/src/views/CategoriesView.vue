@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
 import { computed, onMounted, ref } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
@@ -167,7 +166,6 @@ onMounted(() => cats.load());
     :error="cats.error"
     @retry="cats.load()"
   >
-    <FamilyOnlyNotice feature="分類設定" />
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNewMain">新增主分類</AppButton>
     </template>

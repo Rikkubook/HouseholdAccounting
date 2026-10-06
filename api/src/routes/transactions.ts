@@ -17,7 +17,7 @@ import { badRequest, forbidden, notFound } from "../lib/errors.js";
 import { monthRange } from "../lib/dates.js";
 import { requireAuth, type AppEnv } from "../middleware/auth.js";
 import { findView, toView, transactionViewQuery } from "../services/views.js";
-import { canSeeTransaction, resolveScope, txScope } from "../services/scope.js";
+import { txScope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 
@@ -30,7 +30,7 @@ transactionRoutes.get("/", zValidator("query", transactionQuerySchema), async (c
 
   const where = and(
     eq(transactions.isDeleted, false),
-    txScope(resolveScope(c.get("user"), q.scope)),
+    txScope(),
     range ? gte(transactions.date, range.start) : undefined,
     range ? lt(transactions.date, range.end) : undefined,
     q.type !== "all" ? eq(transactions.type, q.type) : undefined,
@@ -61,8 +61,6 @@ transactionRoutes.get("/", zValidator("query", transactionQuerySchema), async (c
 /** 記帳者由後端取登入者，不接受前端傳入（不可代記他人）。 */
 transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c) => {
   const draft = c.req.valid("json");
-  const user = c.get("user");
-  const scope = resolveScope(user, draft.scope);
   const names = await assertCategoryMatches(draft.type, draft.mainCategoryId, draft.subCategoryId);
 
   const [row] = await db
@@ -73,9 +71,7 @@ transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c
       subCategoryId: draft.subCategoryId,
       amount: draft.amount,
       date: draft.date,
-      payerId: user.id,
-      // 個人帳的 owner 恆為記帳者本人（sql/0002 的 check 約束也會擋）
-      ownerId: scope.kind === "personal" ? user.id : null,
+      payerId: c.get("user").id,
       note: draft.note ?? null,
       // 分類名稱在此凍結，日後改名不影響這筆
       mainCategoryName: names.main,
@@ -97,8 +93,7 @@ transactionRoutes.patch("/:id", idParam, zValidator("json", transactionPatchSche
   const user = c.get("user");
 
   const [current] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
-  // 別人的個人帳一律當作不存在，不洩漏它的存在；管理者也不例外
-  if (!current || current.isDeleted || !canSeeTransaction(user, current)) throw notFound("交易不存在");
+  if (!current || current.isDeleted) throw notFound("交易不存在");
   if (user.role !== "admin" && current.payerId !== user.id) throw forbidden("只能修改自己記的交易");
 
   const nextMain = patch.mainCategoryId === undefined ? current.mainCategoryId : patch.mainCategoryId;
@@ -146,7 +141,7 @@ transactionRoutes.delete("/:id", idParam, async (c) => {
   const user = c.get("user");
 
   const [current] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
-  if (!current || current.isDeleted || !canSeeTransaction(user, current)) throw notFound("交易不存在");
+  if (!current || current.isDeleted) throw notFound("交易不存在");
   if (user.role !== "admin" && current.payerId !== user.id) throw forbidden("只能刪除自己記的交易");
 
   await db.update(transactions).set({ isDeleted: true }).where(eq(transactions.id, id));
@@ -155,8 +150,6 @@ transactionRoutes.delete("/:id", idParam, async (c) => {
 
 transactionRoutes.get("/:id/revisions", idParam, async (c) => {
   const { id } = c.req.valid("param");
-  const [current] = await db.select().from(transactions).where(eq(transactions.id, id)).limit(1);
-  if (!current || !canSeeTransaction(c.get("user"), current)) throw notFound("交易不存在");
   const rows = await db
     .select()
     .from(transactionRevisions)
@@ -182,8 +175,7 @@ async function assertCategoryMatches(
   }
 
   const [main] = await db.select().from(mainCategories).where(eq(mainCategories.id, mainCategoryId)).limit(1);
-  // 第 1 批的個人交易也沿用家庭分類；個人分類（owner_id 有值）要到第 2 批才開放
-  if (!main || main.ownerId != null) throw badRequest("分類不存在");
+  if (!main) throw badRequest("分類不存在");
   if (main.type !== type) throw badRequest("分類與收支別不符");
 
   if (subCategoryId == null) return { main: main.name, sub: null };

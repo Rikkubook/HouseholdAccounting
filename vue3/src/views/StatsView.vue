@@ -7,12 +7,10 @@ import SegmentedControl from "@/components/base/SegmentedControl.vue";
 import ChipGroup from "@/components/base/ChipGroup.vue";
 import { summaryApi, type StatsPayload } from "@/api/summary";
 import { useMembersStore } from "@/stores/members";
-import { useScopeStore } from "@/stores/scope";
 import { currentMonth, money, percent } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const members = useMembersStore();
-const scope = useScopeStore();
 
 const range = ref<"month" | "year">("month");
 const month = ref(currentMonth());
@@ -53,11 +51,6 @@ async function load() {
 }
 
 watch([range, month, year, payerId], load);
-// 切換帳本：個人帳只有自己，清掉成員篩選後重新查詢
-watch(
-  () => scope.current,
-  () => (payerId.value === null ? load() : (payerId.value = null))
-);
 onMounted(async () => {
   await members.load();
   await load();
@@ -98,7 +91,7 @@ onMounted(async () => {
           <option v-for="y in yearOptions" :key="y" :value="y">{{ y }} 年</option>
         </select>
         <div class="md:ml-auto">
-          <ChipGroup v-if="!scope.isPersonal" :options="payerOptions" :model-value="payerId" @update:model-value="payerId = $event as number | null" />
+          <ChipGroup :options="payerOptions" :model-value="payerId" @update:model-value="payerId = $event as number | null" />
         </div>
       </div>
     </AppCard>

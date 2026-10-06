@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -18,7 +18,6 @@ import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useTransactionsStore } from "@/stores/transactions";
 import { useUiStore } from "@/stores/ui";
-import { useScopeStore } from "@/stores/scope";
 import { RouterLink } from "vue-router";
 import { currentMonth, money, weekdayLabel } from "@/utils/format";
 import type { TransactionView } from "@/types/models";
@@ -28,9 +27,6 @@ const cats = useCategoriesStore();
 const members = useMembersStore();
 const store = useTransactionsStore();
 const ui = useUiStore();
-const scope = useScopeStore();
-// 切換帳本：清掉成員篩選（個人帳只有自己）並重新查詢
-watch(() => scope.current, () => store.setFilter({ payerId: null }));
 
 const editing = ref<TransactionView | null>(null);
 const editAmount = ref("");
@@ -127,7 +123,6 @@ onMounted(async () => {
             <option v-for="c in cats.selectable" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <select
-            v-if="!scope.isPersonal"
             :value="store.query.payerId ?? ''"
             class="h-[38px] px-2.5 rounded-md border border-strong bg-surface text-[12.5px] text-fg-2 outline-none"
             @change="store.setFilter({ payerId: Number(($event.target as HTMLSelectElement).value) || null })"
