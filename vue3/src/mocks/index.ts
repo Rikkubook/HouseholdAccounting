@@ -30,6 +30,8 @@ function view(tx: Transaction): TransactionView {
 }
 
 const live = () => db.transactions.filter((t) => !t.isDeleted);
+/** 與後端一致：依日期、再依 id 由新到舊 */
+const byDateDesc = (a: Transaction, b: Transaction) => b.date.localeCompare(a.date) || b.id - a.id;
 const inMonth = (t: Transaction, month: string) => t.date.startsWith(month);
 const inYear = (t: Transaction, year: number) => t.date.startsWith(String(year));
 const budgetOf = (month: string, catId: number) =>
@@ -326,10 +328,11 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
           id: c.id, name: c.name, icon: c.icon,
           budget: budgetOf(month, c.id),
           spent: mine.reduce((s, t) => s + t.amount, 0),
-          recent: [...mine].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5).map(view),
+          recent: [...mine].sort(byDateDesc).slice(0, 3).map(view),
         };
       }),
-      recent: [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5).map(view),
+      // 與後端一致：最近交易依建立時間由新到舊取 5 筆
+      recent: [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id - a.id).slice(0, 5).map(view),
     };
   }],
   [/^\/summary\/stats$/, "get", (_m, _b, q) => {

@@ -37,7 +37,8 @@ const isFutureDate = computed(() => date.value > todayISO());
 
 function switchType(next: string) {
   type.value = next as TxType;
-  mainId.value = null;
+  // 只有一個可選的主分類時直接選好（例如收入只有「薪資」）
+  mainId.value = mainOptions.value.length === 1 ? mainOptions.value[0]!.id : null;
   subId.value = null;
 }
 
@@ -50,7 +51,8 @@ function pickMain(id: number) {
 async function submit() {
   if (saving.value) return;
   if (!amount.value || Number(amount.value) <= 0) return (error.value = "請填寫金額，且須大於 0");
-  if (type.value === "expense" && !mainId.value) return (error.value = "請選擇主分類");
+  // 收入與支出都要選主分類（原本只有支出顯示分類選單，收入因此全部沒有分類）
+  if (mainOptions.value.length && !mainId.value) return (error.value = "請選擇主分類");
   if (subOptions.value.length && !subId.value) return (error.value = "請選擇子分類");
 
   saving.value = true;
@@ -101,7 +103,7 @@ onMounted(() => cats.load());
           <AmountInput v-model="amount" :invalid="error.includes('金額')" />
         </FormField>
 
-        <div v-if="type === 'expense'" class="flex flex-col gap-2">
+        <div v-if="mainOptions.length" class="flex flex-col gap-2">
           <span class="text-label text-fg-3">主分類</span>
           <div class="grid grid-cols-3 gap-2 md:grid-cols-6">
             <button

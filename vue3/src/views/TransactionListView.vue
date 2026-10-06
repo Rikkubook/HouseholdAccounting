@@ -12,14 +12,17 @@ import AmountInput from "@/components/base/AmountInput.vue";
 import MonthStepper from "@/components/base/MonthStepper.vue";
 import SegmentedControl from "@/components/base/SegmentedControl.vue";
 import TransactionRow from "@/components/data/TransactionRow.vue";
+import TransactionDayHeader from "@/components/data/TransactionDayHeader.vue";
+import { txGridColumns } from "@/components/data/transactionGrid";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { useAuthStore } from "@/stores/auth";
 import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useTransactionsStore } from "@/stores/transactions";
 import { useUiStore } from "@/stores/ui";
+import { normalizeError } from "@/api/client";
 import { RouterLink } from "vue-router";
-import { currentMonth, money, weekdayLabel } from "@/utils/format";
+import { currentMonth } from "@/utils/format";
 import type { TransactionView } from "@/types/models";
 
 const auth = useAuthStore();
@@ -32,6 +35,7 @@ const editing = ref<TransactionView | null>(null);
 const editAmount = ref("");
 const editDate = ref("");
 const editNote = ref("");
+const editMainId = ref<number | null>(null);
 const editSubId = ref<number | null>(null);
 
 const typeOptions = [
@@ -45,26 +49,57 @@ function canEdit(tx: TransactionView) {
   return auth.isAdmin || tx.payerId === auth.user?.id;
 }
 
-const editSubOptions = computed(
-  () => cats.selectable.find((c) => c.id === editing.value?.mainCategoryId)?.subCategories ?? []
-);
+/**
+ * 主分類：同收支別、仍啟用的分類；這筆原本的分類若已停用也保留在選單裡，不會變空白。
+ * 子分類跟著選定的主分類走（只列啟用中的，原本選的若已停用也保留）。
+ */
+const editMainOptions = computed(() => {
+  const tx = editing.value;
+  if (!tx) return [];
+  const options = cats.selectable.filter((c) => c.type === tx.type);
+  const original = tx.mainCategoryId == null ? undefined : cats.byId(tx.mainCategoryId);
+  return original && !options.some((c) => c.id === original.id) ? [...options, original] : options;
+});
+const editSubOptions = computed(() => {
+  const main = editMainOptions.value.find((c) => c.id === editMainId.value);
+  if (!main) return [];
+  const active = main.subCategories.filter((sub) => sub.isActive);
+  const original = main.subCategories.find((sub) => sub.id === editing.value?.subCategoryId);
+  return original && !active.some((sub) => sub.id === original.id) ? [...active, original] : active;
+});
+
+function pickEditMain(id: number | null) {
+  editMainId.value = id;
+  editSubId.value = null; // 換主分類就重選子分類（子分類不可跨主分類搬移）
+}
 
 function openEdit(tx: TransactionView) {
   editing.value = tx;
   editAmount.value = String(tx.amount);
   editDate.value = tx.date;
   editNote.value = tx.note ?? "";
+  editMainId.value = tx.mainCategoryId;
   editSubId.value = tx.subCategoryId;
 }
 
 async function saveEdit() {
-  if (!editing.value) return;
-  await store.update(editing.value.id, {
-    amount: Number(editAmount.value),
-    date: editDate.value,
-    note: editNote.value.trim() || null,
-    subCategoryId: editSubId.value,
-  });
+  const tx = editing.value;
+  if (!tx) return;
+  if (editMainOptions.value.length && !editMainId.value) return ui.flash("請選擇主分類", "danger");
+  if (editSubOptions.value.length && !editSubId.value) return ui.flash("請選擇子分類", "danger");
+
+  // 分類有改才送：後端收到分類欄位就會重寫分類名稱快照
+  const categoryChanged = editMainId.value !== tx.mainCategoryId || editSubId.value !== tx.subCategoryId;
+  try {
+    await store.update(tx.id, {
+      amount: Number(editAmount.value),
+      date: editDate.value,
+      note: editNote.value.trim() || null,
+      ...(categoryChanged ? { mainCategoryId: editMainId.value, subCategoryId: editSubId.value } : {}),
+    });
+  } catch (e) {
+    return ui.flash(normalizeError(e).message, "danger");
+  }
   ui.flash("已更新這筆交易，修改紀錄已保存");
   editing.value = null;
 }
@@ -146,7 +181,7 @@ onMounted(async () => {
     <AppCard pad="none">
       <div
         class="hidden md:grid px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4"
-        :style="{ gridTemplateColumns: '84px 34px minmax(0,1fr) 72px 104px 72px' }"
+        :style="{ gridTemplateColumns: txGridColumns() }"
       >
         <span>日期</span><span></span><span>子項目</span><span>記帳者</span>
         <span class="text-right">金額</span><span></span>
@@ -168,10 +203,7 @@ onMounted(async () => {
       <!-- 手機：按日期分組 + 當日小計 -->
       <div class="md:hidden">
         <div v-for="group in store.groupedByDate" :key="group.date">
-          <div class="flex items-baseline gap-2 px-4 py-2.5 bg-surface-subtle border-b">
-            <span class="font-mono text-[11.5px] text-fg-3">{{ weekdayLabel(group.date) }}</span>
-            <span class="ml-auto text-[11.5px] text-fg-3 tnum">當日小計 {{ money(group.subtotal) }}</span>
-          </div>
+          <TransactionDayHeader :date="group.date" :subtotal="group.subtotal" />
           <TransactionRow
             v-for="tx in group.items"
             :key="tx.id"
@@ -214,12 +246,27 @@ onMounted(async () => {
           class="h-[46px] px-3 rounded-lg border border-strong bg-surface text-[14px] text-fg-1 outline-none box-border"
         />
       </FormField>
+      <FormField v-if="editMainOptions.length" label="主分類">
+        <select
+          :value="editMainId ?? ''"
+          class="h-[46px] px-2.5 rounded-lg border border-strong bg-surface text-[15px] text-fg-1 outline-none"
+          @change="pickEditMain(Number(($event.target as HTMLSelectElement).value) || null)"
+        >
+          <option value="" disabled>請選擇</option>
+          <option v-for="c in editMainOptions" :key="c.id" :value="c.id">
+            {{ c.name }}{{ c.isActive ? "" : "（已停用）" }}
+          </option>
+        </select>
+      </FormField>
       <FormField v-if="editSubOptions.length" label="子分類">
         <select
           v-model.number="editSubId"
           class="h-[46px] px-2.5 rounded-lg border border-strong bg-surface text-[15px] text-fg-1 outline-none"
         >
-          <option v-for="s in editSubOptions" :key="s.id" :value="s.id">{{ s.name }}</option>
+          <option :value="null" disabled>請選擇</option>
+          <option v-for="s in editSubOptions" :key="s.id" :value="s.id">
+            {{ s.name }}{{ s.isActive ? "" : "（已停用）" }}
+          </option>
         </select>
       </FormField>
       <FormField label="備註"><TextInput v-model="editNote" placeholder="例如：週末採買" /></FormField>
