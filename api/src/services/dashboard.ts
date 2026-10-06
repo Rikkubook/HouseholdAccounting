@@ -10,7 +10,7 @@ import { fixedTotal } from "./fixed.js";
 import { intSum, notFuture, onlyFuture, toView, transactionViewQuery } from "./views.js";
 
 const RECENT_PER_CATEGORY = 3;
-const RECENT_OVERALL = 8;
+const RECENT_OVERALL = 5;
 
 /** 儀表板單頁需跨 4 張表，後端一次算完回傳，前端不再組合。 */
 export async function buildDashboard(month: string): Promise<DashboardPayload> {
@@ -74,7 +74,13 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
         transactionViewQuery().where(inMonth).orderBy(desc(transactions.date), desc(transactions.id))
       ),
     ]);
-  const recentRows = monthRows.slice(0, RECENT_OVERALL);
+  /**
+   * 首頁「最近交易」：依建立時間由新到舊取 5 筆。直接從已抓的整月資料排序，
+   * 不另外下 LIMIT 查詢——多一支平行查詢就可能超出連線池而排隊（見上方 monthRows 註解）。
+   */
+  const recentRows = [...monthRows]
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || b.id - a.id)
+    .slice(0, RECENT_OVERALL);
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;
   const expense = totals.find((t) => t.type === "expense")?.amount ?? 0;

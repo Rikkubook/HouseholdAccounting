@@ -4,6 +4,7 @@ import { transactionsApi, type Paged, type TransactionQuery } from "@/api/transa
 import type { TransactionPatch, TransactionView } from "@/types/models";
 import { currentMonth } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
+import { groupByDate } from "@/utils/transactions";
 
 export const PAGE_SIZE = 20;
 
@@ -26,19 +27,7 @@ export const useTransactionsStore = defineStore("transactions", () => {
   const isEmpty = computed(() => !loading.value && result.value.items.length === 0);
 
   /** 手機版按日期分組並附當日小計。 */
-  const groupedByDate = computed(() => {
-    const map = new Map<string, TransactionView[]>();
-    for (const tx of result.value.items) {
-      const list = map.get(tx.date) ?? [];
-      list.push(tx);
-      map.set(tx.date, list);
-    }
-    return [...map.entries()].map(([date, items]) => ({
-      date,
-      items,
-      subtotal: items.reduce((sum, t) => sum + (t.type === "expense" ? t.amount : 0), 0),
-    }));
-  });
+  const groupedByDate = computed(() => groupByDate(result.value.items));
 
   async function load() {
     loading.value = true;

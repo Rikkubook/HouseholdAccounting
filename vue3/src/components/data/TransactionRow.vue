@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import { money, shortDate } from "@/utils/format";
 import IconButton from "@/components/base/IconButton.vue";
+import { txGridColumns } from "./transactionGrid";
 import type { TransactionView } from "@/types/models";
 
-/** canEdit：管理者，或該筆的記帳者本人。false 時操作圖示直接隱藏，不做灰階。 */
-defineProps<{ tx: TransactionView; canEdit: boolean; showPayer?: boolean }>();
+/**
+ * canEdit：管理者，或該筆的記帳者本人。false 時操作圖示直接隱藏，不做灰階。
+ * readonly：只看不改（首頁最近交易），桌機不留操作欄。
+ */
+defineProps<{
+  tx: TransactionView;
+  canEdit: boolean;
+  showPayer?: boolean;
+  readonly?: boolean;
+}>();
 defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
 </script>
 
@@ -12,7 +21,7 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
   <!-- 桌機：多欄表格列 -->
   <div
     class="hidden md:grid items-center gap-3 px-5 py-[11px] border-b border-[rgba(0,0,0,.04)] text-[12.5px] hover:bg-surface-subtle"
-    :style="{ gridTemplateColumns: '84px 34px minmax(0,1fr) 72px 104px 72px' }"
+    :style="{ gridTemplateColumns: txGridColumns(readonly) }"
   >
     <span class="font-mono text-[11.5px] text-fg-4">{{ shortDate(tx.date) }}</span>
     <span class="w-[26px] h-[26px] rounded-sm bg-surface-muted border flex items-center justify-center text-fg-3">
@@ -24,7 +33,7 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
     </span>
     <span v-if="showPayer" class="text-fg-3 text-[12px]">{{ tx.payerName }}</span>
     <span class="text-right text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
-    <span class="flex justify-end gap-0.5">
+    <span v-if="!readonly" class="flex justify-end gap-0.5">
       <template v-if="canEdit">
         <IconButton icon="edit" label="編輯這筆" :size="30" @click="$emit('edit', tx)" />
         <IconButton icon="delete" label="刪除這筆" variant="danger" :size="30" @click="$emit('remove', tx)" />
@@ -37,10 +46,10 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
     <span class="flex flex-col gap-0.5 min-w-0" @click="canEdit && $emit('edit', tx)">
       <span class="text-body text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName ?? "—" }}</span>
       <span class="text-[10.5px] text-fg-4">
-        {{ tx.mainCategoryName }} · {{ tx.payerName }}<template v-if="tx.note"> · {{ tx.note }}</template>
+        {{ [tx.mainCategoryName, tx.payerName, tx.note].filter(Boolean).join(" · ") }}
       </span>
     </span>
     <span class="ml-auto text-body text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
-    <IconButton v-if="canEdit" icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
+    <IconButton v-if="canEdit && !readonly" icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
   </div>
 </template>

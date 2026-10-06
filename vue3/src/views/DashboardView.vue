@@ -6,9 +6,13 @@ import AppCard from "@/components/base/AppCard.vue";
 import MetricStat from "@/components/base/MetricStat.vue";
 import SegmentedControl from "@/components/base/SegmentedControl.vue";
 import CategoryBudgetCard from "@/components/data/CategoryBudgetCard.vue";
+import TransactionRow from "@/components/data/TransactionRow.vue";
+import TransactionDayHeader from "@/components/data/TransactionDayHeader.vue";
+import { groupByDate } from "@/utils/transactions";
+import { txGridColumns } from "@/components/data/transactionGrid";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { useDashboardStore } from "@/stores/dashboard";
-import { addMonths, currentMonth, money, shortDate } from "@/utils/format";
+import { addMonths, currentMonth } from "@/utils/format";
 
 const store = useDashboardStore();
 const thisMonth = currentMonth();
@@ -20,6 +24,7 @@ const periodOptions = [
   { value: lastMonth, label: "上月" },
 ];
 const summary = computed(() => store.data?.summary);
+const recentByDate = computed(() => groupByDate(store.data?.recent ?? []));
 
 onMounted(() => store.load());
 </script>
@@ -81,15 +86,23 @@ onMounted(() => store.load());
         <div class="text-section font-bold text-fg-1">最近交易</div>
         <div class="text-[11.5px] text-fg-3 mt-0.5">依建立時間由近到遠，顯示 5 筆</div>
       </div>
+      <!-- 與交易列表同一個列元件與欄寬；首頁只看不改，不留操作欄 -->
       <div
-        v-for="tx in store.data?.recent ?? []"
-        :key="tx.id"
-        class="flex items-baseline gap-2.5 px-4 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px] md:px-5"
+        class="hidden md:grid px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4"
+        :style="{ gridTemplateColumns: txGridColumns(true) }"
       >
-        <span class="font-mono text-[11px] text-fg-4">{{ shortDate(tx.date) }}</span>
-        <span class="text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
-        <span class="text-[11px] text-fg-4">{{ tx.payerName }}</span>
-        <span class="ml-auto text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
+        <span>日期</span><span></span><span>子項目</span><span>記帳者</span>
+        <span class="text-right">金額</span>
+      </div>
+      <div class="hidden md:block">
+        <TransactionRow v-for="tx in store.data?.recent ?? []" :key="tx.id" :tx="tx" :can-edit="false" show-payer readonly />
+      </div>
+      <!-- 手機：與交易列表相同，按日期分組 + 當日小計 -->
+      <div class="md:hidden">
+        <div v-for="group in recentByDate" :key="group.date">
+          <TransactionDayHeader :date="group.date" :subtotal="group.subtotal" />
+          <TransactionRow v-for="tx in group.items" :key="tx.id" :tx="tx" :can-edit="false" readonly />
+        </div>
       </div>
       <RouterLink to="/transactions" class="block px-4 py-3 text-[12px] text-brand-500 md:px-5">
         查看完整歷史 →
