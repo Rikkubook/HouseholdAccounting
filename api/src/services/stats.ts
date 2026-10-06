@@ -4,7 +4,7 @@ import { db } from "../db/index.js";
 import { budgets, transactions } from "../db/schema.js";
 import { addMonths, existsInMonth, monthRange, yearRange } from "../lib/dates.js";
 import { listCategories } from "./categories.js";
-import { budgetScope, txScope } from "./scope.js";
+import { budgetScope, FAMILY, txScope, type Scope } from "./scope.js";
 import { effectiveSubscriptions } from "./fixed.js";
 import { intSum, notFuture } from "./views.js";
 
@@ -12,7 +12,8 @@ import { intSum, notFuture } from "./views.js";
 export async function buildStats(
   range: "month" | "year",
   period: string,
-  payerId?: number | null
+  payerId?: number | null,
+  scope: Scope = FAMILY
 ): Promise<StatsPayload> {
   const isYear = range === "year";
   const { start, end } = isYear ? yearRange(Number(period)) : monthRange(period);
@@ -22,7 +23,7 @@ export async function buildStats(
 
   const where = and(
     eq(transactions.isDeleted, false),
-    txScope(),
+    txScope(scope),
     eq(transactions.type, "expense"),
     gte(transactions.date, start),
     lt(transactions.date, end),
@@ -42,8 +43,8 @@ export async function buildStats(
       .where(where)
       .groupBy(transactions.mainCategoryId, transactions.subCategoryId),
     listCategories(true),
-    db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope())),
-    ...months.map((m) => effectiveSubscriptions(m)),
+    db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope(scope))),
+    ...months.map((m) => effectiveSubscriptions(m, scope)),
   ]);
 
   const catMap = new Map(categories.map((c) => [c.id, c]));

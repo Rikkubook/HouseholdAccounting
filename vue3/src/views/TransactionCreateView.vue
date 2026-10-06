@@ -13,6 +13,7 @@ import { transactionsApi } from "@/api/transactions";
 import { useAuthStore } from "@/stores/auth";
 import { useCategoriesStore } from "@/stores/categories";
 import { useUiStore } from "@/stores/ui";
+import { SCOPE_OPTIONS, useScopeStore, type ScopeName } from "@/stores/scope";
 import { todayISO } from "@/utils/format";
 import type { TxType } from "@/types/models";
 
@@ -20,6 +21,9 @@ const router = useRouter();
 const auth = useAuthStore();
 const cats = useCategoriesStore();
 const ui = useUiStore();
+const scope = useScopeStore();
+/** 預設記在目前切換的帳本；建立後不可改到另一本 */
+const ledger = ref<ScopeName>(scope.current);
 
 const type = ref<TxType>("expense");
 const mainId = ref<number | null>(null);
@@ -63,8 +67,9 @@ async function submit() {
       amount: Number(amount.value),
       date: date.value,
       note: note.value.trim() || undefined,
+      scope: ledger.value,
     });
-    ui.flash("已記下一筆");
+    ui.flash(ledger.value === "personal" ? "已記在個人帳" : "已記下一筆");
     // 儲存成功後回到交易列表，不停留連續記帳
     await router.push({ name: "transactions" });
   } catch {
@@ -88,6 +93,16 @@ onMounted(() => cats.load());
   >
     <AppCard>
       <div class="flex flex-col gap-4">
+        <div v-if="scope.canUsePersonal" class="flex flex-col gap-[7px]">
+          <span class="text-label text-fg-3">記在</span>
+          <SegmentedControl
+            :options="SCOPE_OPTIONS.map((o) => ({ value: o.value, label: o.label + '帳' }))"
+            :model-value="ledger"
+            @update:model-value="ledger = $event as ScopeName"
+          />
+          <span v-if="ledger === 'personal'" class="text-[10.5px] text-fg-4">只有自己看得到，不計入家庭帳；記下後不能改到家庭帳</span>
+        </div>
+
         <SegmentedControl
           :options="[
             { value: 'expense', label: '支出' },

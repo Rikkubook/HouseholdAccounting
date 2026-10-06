@@ -17,7 +17,7 @@ const base: TransactionView = {
   note: "週末採買",
   createdAt: "2026-09-03T09:10:00Z",
   isDeleted: false,
-  sourceSubscriptionId: null,
+  sourceSubscriptionId: null, ownerId: null,
   mainCategoryName: "食",
   subCategoryName: "食材",
   payerName: "太太",

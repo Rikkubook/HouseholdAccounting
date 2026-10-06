@@ -63,6 +63,8 @@ export interface Transaction {
   isDeleted: boolean;
   /** 由訂閱自動產生時記錄來源 */
   sourceSubscriptionId: number | null;
+  /** null = 家庭帳；有值 = 該成員的個人帳 */
+  ownerId: number | null;
 }
 
 export interface TransactionRevision {
@@ -82,6 +84,8 @@ export interface TransactionDraft {
   amount: number;
   date: string;
   note?: string;
+  /** 記在家庭帳或自己的個人帳（僅管理者）；不傳則用目前切換的帳本 */
+  scope?: "family" | "personal";
 }
 
 export interface TransactionPatch {

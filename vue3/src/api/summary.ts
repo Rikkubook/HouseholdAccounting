@@ -1,4 +1,5 @@
 import { http } from "./client";
+import { activeScope } from "@/stores/scope";
 import type { CategoryProgress, MonthSummary, TransactionView, YearExtraExpense } from "@/types/models";
 
 export interface DashboardPayload {
@@ -54,13 +55,13 @@ export interface YearSummaryPayload {
 
 export const summaryApi = {
   dashboard: (month: string) =>
-    http.get<DashboardPayload>("/summary/dashboard", { params: { month } }).then((r) => r.data),
+    http.get<DashboardPayload>("/summary/dashboard", { params: { month, scope: activeScope() } }).then((r) => r.data),
 
   stats: (range: "month" | "year", period: string, payerId?: number | null) =>
-    http.get<StatsPayload>("/summary/stats", { params: { range, period, payerId } }).then((r) => r.data),
+    http.get<StatsPayload>("/summary/stats", { params: { range, period, payerId, scope: activeScope() } }).then((r) => r.data),
 
   year: (year: number) =>
-    http.get<YearSummaryPayload>("/summary/year", { params: { year } }).then((r) => r.data),
+    http.get<YearSummaryPayload>("/summary/year", { params: { year, scope: activeScope() } }).then((r) => r.data),
 
   createYearExtra: (draft: Omit<YearExtraExpense, "id">) =>
     http.post<YearExtraExpense>("/summary/year-extras", draft).then((r) => r.data),

@@ -5,7 +5,7 @@ import { budgets, transactions } from "../db/schema.js";
 import { existsInMonth, monthRange } from "../lib/dates.js";
 import { timed } from "../lib/timed.js";
 import { listCategories } from "./categories.js";
-import { budgetScope, txScope } from "./scope.js";
+import { budgetScope, FAMILY, txScope, type Scope } from "./scope.js";
 import { fixedTotal } from "./fixed.js";
 import { intSum, notFuture, onlyFuture, toView, transactionViewQuery } from "./views.js";
 
@@ -13,11 +13,11 @@ const RECENT_PER_CATEGORY = 3;
 const RECENT_OVERALL = 8;
 
 /** 儀表板單頁需跨 4 張表，後端一次算完回傳，前端不再組合。 */
-export async function buildDashboard(month: string): Promise<DashboardPayload> {
+export async function buildDashboard(month: string, scope: Scope = FAMILY): Promise<DashboardPayload> {
   const { start, end } = monthRange(month);
   const inMonth = and(
     eq(transactions.isDeleted, false),
-    txScope(),
+    txScope(scope),
     gte(transactions.date, start),
     lt(transactions.date, end)
   );
@@ -59,9 +59,10 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
           .from(transactions)
           .where(and(scheduled, eq(transactions.type, "expense")))
       ),
-      timed("dashboard.monthBudgets", db.select().from(budgets).where(and(eq(budgets.month, month), budgetScope()))),
+      timed("dashboard.monthBudgets", db.select().from(budgets).where(and(eq(budgets.month, month), budgetScope(scope)))),
+      // 第 1 批的個人交易沿用家庭分類，分類清單一律取家庭的；預算則依範圍（個人帳尚無預算）
       timed("dashboard.categories", listCategories(true)),
-      timed("dashboard.fixedTotal", fixedTotal(month)),
+      timed("dashboard.fixedTotal", fixedTotal(month, scope)),
       /**
        * 一次抓整月交易（含預定支出），下面同時導出「整體最近交易」與
        * 「各分類最近交易」，不再對每個分類各發一支查詢。家用記帳單月

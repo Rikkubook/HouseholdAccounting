@@ -13,6 +13,7 @@ import SegmentedControl from "@/components/base/SegmentedControl.vue";
 import IconButton from "@/components/base/IconButton.vue";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { summaryApi, type YearSummaryPayload } from "@/api/summary";
+import { useScopeStore } from "@/stores/scope";
 import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
@@ -116,7 +117,9 @@ async function removeExtra(id: number, name: string) {
   await load();
 }
 
+const scope = useScopeStore();
 watch(year, load);
+watch(() => scope.current, load);
 onMounted(async () => {
   await Promise.all([cats.load(), members.load()]);
   await load();
@@ -139,7 +142,7 @@ onMounted(async () => {
       >
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }} 年</option>
       </select>
-      <AppButton variant="action" icon="add" @click="openNew">新增年度額外開銷</AppButton>
+      <AppButton v-if="!scope.isPersonal" variant="action" icon="add" @click="openNew">新增年度額外開銷</AppButton>
     </template>
 
     <div class="md:hidden">
@@ -365,7 +368,7 @@ onMounted(async () => {
     </AppDialog>
 
     <template #fab>
-      <FloatingActionButton label="新增額外開銷" @click="openNew" />
+      <FloatingActionButton v-if="!scope.isPersonal" label="新增額外開銷" @click="openNew" />
     </template>
   </AppShell>
 </template>

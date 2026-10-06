@@ -5,7 +5,8 @@ import AppCard from "@/components/base/AppCard.vue";
 import ProgressBar from "@/components/base/ProgressBar.vue";
 import type { CategoryProgress } from "@/types/models";
 
-defineProps<{ category: CategoryProgress }>();
+/** hideBudgetLink：個人帳尚無個人預算，「設定預算」會連到家庭預算頁，所以不顯示 */
+defineProps<{ category: CategoryProgress; hideBudgetLink?: boolean }>();
 </script>
 
 <template>
@@ -18,7 +19,7 @@ defineProps<{ category: CategoryProgress }>();
 
       <!-- 未設預算：提示放在分類名稱旁 -->
       <RouterLink
-        v-if="category.budget === null"
+        v-if="category.budget === null && !hideBudgetLink"
         to="/budget"
         class="flex items-center gap-1 text-[11px] text-brand-500 whitespace-nowrap"
       >

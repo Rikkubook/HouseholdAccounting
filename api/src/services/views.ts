@@ -22,6 +22,7 @@ const viewColumns = {
   createdAt: transactions.createdAt,
   isDeleted: transactions.isDeleted,
   sourceSubscriptionId: transactions.sourceSubscriptionId,
+  ownerId: transactions.ownerId,
   mainCategoryName: transactions.mainCategoryName,
   subCategoryName: transactions.subCategoryName,
   payerName: members.name,
