@@ -37,9 +37,10 @@ defineProps<{ category: CategoryProgress }>();
     <div v-if="category.recent.length" class="mt-3 pt-3 border-t flex flex-col gap-2">
       <div v-for="tx in category.recent" :key="tx.id" class="flex items-baseline gap-2 text-[12px]">
         <span class="font-mono text-[11px] text-fg-4">{{ shortDate(tx.date) }}</span>
-        <span class="text-fg-2 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
-        <span class="text-fg-4 text-[11px]">{{ tx.payerName }}</span>
-        <span class="ml-auto text-fg-1 tnum">{{ money(tx.amount) }}</span>
+        <span class="text-fg-2 whitespace-nowrap">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
+        <span v-if="tx.note" class="text-note text-[11px] truncate min-w-0">{{ tx.note }}</span>
+        <span class="text-fg-4 text-[11px] whitespace-nowrap">{{ tx.payerName }}</span>
+        <span class="ml-auto pl-2 text-fg-1 tnum whitespace-nowrap">{{ money(tx.amount) }}</span>
       </div>
       <RouterLink to="/transactions" class="text-[12px] text-brand-500 self-start">查看完整歷史 →</RouterLink>
     </div>
