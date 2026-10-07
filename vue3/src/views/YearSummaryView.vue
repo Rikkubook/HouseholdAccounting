@@ -95,8 +95,7 @@ function lifecycleLabel(row: YearSummaryPayload["rows"][number]) {
 
 function cellClass(row: YearSummaryPayload["rows"][number], value: number | null) {
   if (value === null) return "text-fg-disabled";
-  if (row.monthlyBudget && value >= row.monthlyBudget) return "text-state-over font-bold";
-  if (row.monthlyBudget && value >= row.monthlyBudget * 0.7) return "text-state-near";
+  if (row.monthlyBudget && value > row.monthlyBudget) return "text-state-near";
   return "text-fg-2";
 }
 
