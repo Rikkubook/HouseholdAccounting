@@ -126,7 +126,7 @@ subscriptionRoutes.post("/:id/mark-paid", requireAdmin, idParam, async (c) => {
   if (!sub) throw notFound("訂閱不存在");
   if (!sub.isActive) throw badRequest("已停用的訂閱不能標記扣款");
 
-  const result = await chargeOnce(id);
+  const result = await chargeOnce(id, c.get("user").id);
   if (!result) throw badRequest("本期已扣款，無需重複標記");
 
   const [updated] = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);

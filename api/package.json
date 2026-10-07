@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit",
     "db:push": "tsx src/db/push.ts",
     "db:seed": "tsx src/db/seed.ts",
+    "db:force-import-2026": "tsx src/db/force-import-2026.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

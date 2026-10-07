@@ -9,7 +9,7 @@
 | 登入 | `/login` | Session（登入） | ✓ | – | – | – | 公開 |
 | 忘記密碼 | `/reset-password` | 密碼 | – | – | ✓ | – | 公開（需重設碼） |
 | 首頁儀表板 | `/` | 彙總資料 | – | ✓ | – | – | 全員 |
-| 新增交易 | `/transactions/new` | 交易 | ✓ | – | – | – | 全員 |
+| 新增交易 | `/transactions/new` | 交易 | ✓ | – | – | – | 全員（ADMIN 可代記他人） |
 | 交易列表 | `/transactions` | 交易 | – | ✓ | ✓ | 軟刪 | 全員（僅能改/刪自己的，ADMIN 不受限） |
 | 統計圖表 | `/stats` | 彙總資料 | – | ✓ | – | – | 全員 |
 | 年度彙整 | `/year` | 彙總資料、年度額外支出 | ✓ | ✓ | – | 硬刪 | 讀全員／額外支出寫 ADMIN |
@@ -46,16 +46,16 @@
 
 | 操作 | 方法 | 端點 | 說明 |
 |---|---|---|---|
-| C | `POST` | `/api/transactions` | 記帳者一律取登入者本人（後端強制，不接受前端指定），不可代記他人 |
+| C | `POST` | `/api/transactions` | `payerId` 省略＝登入者本人；ADMIN 可指定其他成員（代記），一般成員指定他人回 403；不可指定已停用成員。實際輸入者寫入 `createdBy` |
 
-輔助讀取（下拉選單用）：`GET /api/categories`、當前登入者資訊。
+輔助讀取（下拉選單用）：`GET /api/categories`、當前登入者資訊；ADMIN 另讀 `GET /api/members` 供選記帳者。
 
 ## 交易列表 `TransactionListView.vue`（`/transactions`）
 
 | 操作 | 方法 | 端點 | 說明 |
 |---|---|---|---|
 | R | `GET` | `/api/transactions` | 分頁、可依月份/收支類型/分類/記帳者/備註關鍵字篩選 |
-| U | `PATCH` | `/api/transactions/:id` | 只能改金額/日期/分類/備註；收支別與記帳者不可改。一般成員只能改自己記的，ADMIN 不受限。每次異動寫一筆 revision |
+| U | `PATCH` | `/api/transactions/:id` | 可改金額/日期/分類/備註/記帳者；收支別不可改。一般成員只能改自己記的，ADMIN 不受限。記帳者僅 ADMIN 可換，不可換成已停用成員；訂閱產生的交易（改訂閱扣款人）與個人帳交易不可換。每次異動寫一筆 revision |
 | D（軟刪） | `DELETE` | `/api/transactions/:id` | 標記 `isDeleted`，不進任何統計；前台無復原入口。一般成員只能刪自己記的 |
 | R（歷史） | `GET` | `/api/transactions/:id/revisions` | 查看單筆交易的欄位異動歷史 |
 

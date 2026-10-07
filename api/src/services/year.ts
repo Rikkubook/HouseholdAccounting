@@ -6,7 +6,7 @@ import { currentMonth, existsInMonth, yearRange } from "../lib/dates.js";
 import { timed } from "../lib/timed.js";
 import { listCategories } from "./categories.js";
 import { budgetScope, txScope, yearExtraScope } from "./scope.js";
-import { countAll, intSum, notFuture } from "./views.js";
+import { intSum, notFuture } from "./views.js";
 
 /** 年度額外支出不分攤到個別月份，只計入 extra 與 total。 */
 export async function buildYearSummary(year: number): Promise<YearSummaryPayload> {
@@ -23,7 +23,7 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
 
   const monthExpr = sql<string>`to_char(${transactions.date}, 'YYYY-MM')`;
 
-  const [byCatMonth, totals, monthsWithData, budgetRows, categories, extras, byMemberRows] =
+  const [byCatMonth, totals, monthsWithData, budgetRows, categories, extras, byTypeMonth] =
     await Promise.all([
       timed(
         "year.byCatMonth",
@@ -69,23 +69,26 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
           .orderBy(asc(yearExtraExpenses.id))
       ),
       timed(
-        "year.byMember",
+        "year.byTypeMonth",
         db
-          .select({
-            memberId: transactions.payerId,
-            name: members.name,
-            amount: intSum(transactions.amount),
-            count: countAll(),
-          })
+          .select({ type: transactions.type, month: monthExpr, amount: intSum(transactions.amount) })
           .from(transactions)
-          .innerJoin(members, eq(members.id, transactions.payerId))
-          .where(and(inYear, eq(transactions.type, "expense")))
-          .groupBy(transactions.payerId, members.name)
+          .where(inYear)
+          .groupBy(transactions.type, monthExpr)
       ),
     ]);
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;
   const expense = totals.find((t) => t.type === "expense")?.amount ?? 0;
+
+  /** 每月收支與結餘（不含年度額外開銷，與頂端的全年結餘同口徑）；該月沒有任何交易為 null。 */
+  const monthly = months.map((m) => {
+    const inMonth = byTypeMonth.filter((r) => r.month === m);
+    if (inMonth.length === 0) return null;
+    const mIncome = inMonth.find((r) => r.type === "income")?.amount ?? 0;
+    const mExpense = inMonth.find((r) => r.type === "expense")?.amount ?? 0;
+    return { income: mIncome, expense: mExpense, net: mIncome - mExpense };
+  });
 
   const cellMap = new Map<string, number>();
   for (const r of byCatMonth) {
@@ -105,10 +108,12 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
       const startMonth = exists.indexOf(true);
       const endMonth = exists.lastIndexOf(true) + 1;
 
-      /** null = 分類當時不存在，或該月尚未記錄；前端據此顯示「—」而非 0。 */
-      const cells = months.map((m, i) =>
-        i < startMonth || i >= endMonth ? null : (cellMap.get(cat.id + "|" + m) ?? null)
-      );
+      /**
+       * null = 該月沒有記錄；前端據此顯示「—」而非 0。
+       * 有實際交易就一定顯示，即使落在分類生命週期之外（例如補登分類新增前的帳）——
+       * 否則底部支出合計會少算，和頂端的全年支出對不起來。
+       */
+      const cells = months.map((m) => cellMap.get(cat.id + "|" + m) ?? null);
 
       // 該年度最後一次設定的月預算，作為未來月份的預估基準
       const catBudgets = budgetRows
@@ -158,8 +163,8 @@ export async function buildYearSummary(year: number): Promise<YearSummaryPayload
     expense,
     net: income - expense,
     recordedMonths: monthsWithData.length,
+    monthly,
     rows,
     extras,
-    byMember: byMemberRows.sort((a, b) => b.amount - a.amount),
   };
 }

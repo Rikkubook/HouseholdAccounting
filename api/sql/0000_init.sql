@@ -119,7 +119,7 @@ create table if not exists transaction_revisions (
   field          text not null,
   before         text not null,
   after          text not null,
-  -- type 與 payer_id 不可修改，故不會出現在此
+  -- type 不可修改，故不會出現在此；payerId 於 sql/0003 加入白名單
   constraint transaction_revisions_field_check check (
     field in ('mainCategoryId', 'subCategoryId', 'amount', 'date', 'note')
   )

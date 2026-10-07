@@ -148,13 +148,27 @@ const handWritten: Record<string, JsonSchema> = {
   },
   YearSummaryPayload: {
     type: "object",
-    required: ["year", "income", "expense", "net", "recordedMonths", "rows", "extras", "byMember"],
+    required: ["year", "income", "expense", "net", "recordedMonths", "monthly", "rows", "extras"],
     properties: {
       year: { type: "integer" },
       income: { type: "integer" },
       expense: { type: "integer" },
       net: { type: "integer" },
       recordedMonths: { type: "integer" },
+      monthly: {
+        type: "array",
+        description: "12 欄：每月收入、支出、結餘（不含年度額外開銷）；該月沒有交易為 null",
+        items: {
+          type: "object",
+          nullable: true,
+          required: ["income", "expense", "net"],
+          properties: {
+            income: { type: "integer" },
+            expense: { type: "integer" },
+            net: { type: "integer" },
+          },
+        },
+      },
       rows: {
         type: "array",
         items: {
@@ -188,19 +202,6 @@ const handWritten: Record<string, JsonSchema> = {
               properties: { categoryName: { type: "string" }, payerName: { type: "string" } },
             },
           ],
-        },
-      },
-      byMember: {
-        type: "array",
-        items: {
-          type: "object",
-          required: ["memberId", "name", "amount", "count"],
-          properties: {
-            memberId: { type: "integer" },
-            name: { type: "string" },
-            amount: { type: "integer" },
-            count: { type: "integer" },
-          },
         },
       },
     },
@@ -329,7 +330,7 @@ export const openApiDocument = {
       "",
       "### 貫穿全站的規則",
       "- **歷史不可改寫**：交易軟刪除且無復原入口；分類與成員只能停用；交易每次編輯寫入 revision。",
-      "- **記帳者**恆為新增當下的登入者，由後端填入，不接受前端傳 `payerId`，且事後不可修改。",
+      "- **記帳者**預設為登入者；管理者可代記他人（新增時傳 `payerId`）、事後也可更換，對象須為啟用中的成員。訂閱產生的交易與個人帳交易不可更換。實際輸入者記在 `createdBy`。",
       "- **預算**僅浮動支出可設；固定支出由訂閱月換算（年繳 ÷12）自動推算。",
       "- **認證**：`POST /auth/login` 取得 JWT，後續請求帶 `Authorization: Bearer <token>`。",
     ].join("\n"),
@@ -421,7 +422,7 @@ export const openApiDocument = {
       post: {
         tags: ["transactions"],
         summary: "新增交易",
-        description: "記帳者由後端取登入者，**不接受前端傳入**（不可代記他人）。日期可為未來（預定支出）。",
+        description: "`payerId` 省略＝登入者本人；指定他人**僅限管理者**（代記），且須為啟用中的成員。實際輸入者寫入 `createdBy`。日期可為未來（預定支出）。",
         requestBody: { required: true, ...json(ref("TransactionDraft")) },
         responses: { 200: okJson(ref("TransactionView")), 400: commonErrors[400], 401: commonErrors[401] },
       },
@@ -431,7 +432,7 @@ export const openApiDocument = {
         tags: ["transactions"],
         summary: "修改交易",
         description:
-          "可改欄位僅金額、日期、分類、備註；**收支別與記帳者不可修改**。一般成員只能改自己記的，管理者不受限。每個異動欄位寫一列 revision。",
+          "可改欄位：金額、日期、分類、備註、記帳者；**收支別不可修改**。一般成員只能改自己記的，管理者不受限。記帳者僅管理者可換，且訂閱產生的交易與個人帳交易不可換。每個異動欄位寫一列 revision。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("TransactionPatch")) },
         responses: { 200: okJson(ref("TransactionView")), ...commonErrors, 404: err("交易不存在") },

@@ -55,6 +55,37 @@ const footer = computed(() => {
   };
 });
 
+/**
+ * 底部的收入合計、月結餘列。
+ * 各月結餘不含年度額外開銷（它不分攤到單月）；月結餘列的年度總計＝年度結餘：
+ * 全年收入 − 支出合計的年度總計（含額外開銷），額外開銷欄以負數列出差額。
+ */
+const balanceRows = computed(() => {
+  const monthly = data.value?.monthly ?? [];
+  const avg = (v: number) => money(v / Math.max(1, data.value?.recordedMonths ?? 1));
+  return [
+    {
+      label: "收入合計",
+      months: monthly.map((m) => m?.income ?? null),
+      extra: null as number | null,
+      total: data.value?.income ?? 0,
+      avg,
+      signed: false,
+    },
+    {
+      label: "月結餘",
+      months: monthly.map((m) => m?.net ?? null),
+      extra: footer.value.extra ? -footer.value.extra : null,
+      total: (data.value?.income ?? 0) - footer.value.total,
+      avg,
+      signed: true,
+    },
+  ];
+});
+
+/** 結餘為負時標紅 */
+const netClass = (v: number | null) => (v !== null && v < 0 ? "text-danger" : "text-fg-1");
+
 /** 分類生命週期標記：N月新增 / N月起停用。 */
 function lifecycleLabel(row: YearSummaryPayload["rows"][number]) {
   if (row.endMonth < 12) return row.endMonth + 1 + "月起停用";
@@ -68,8 +99,6 @@ function cellClass(row: YearSummaryPayload["rows"][number], value: number | null
   if (row.monthlyBudget && value >= row.monthlyBudget * 0.7) return "text-state-near";
   return "text-fg-2";
 }
-
-const memberTotal = computed(() => (data.value?.byMember ?? []).reduce((s, m) => s + m.amount, 0));
 
 async function load() {
   loading.value = true;
@@ -155,7 +184,14 @@ onMounted(async () => {
       <div class="grid grid-cols-2 gap-5 md:grid-cols-4">
         <MetricStat label="全年收入" :value="data?.income ?? null" size="md" />
         <div class="md:pl-5 md:border-l"><MetricStat label="全年支出" :value="data?.expense ?? null" size="md" /></div>
-        <div class="md:pl-5 md:border-l"><MetricStat label="結餘" :value="data?.net ?? null" size="md" /></div>
+        <div class="md:pl-5 md:border-l">
+          <MetricStat
+            label="結餘"
+            :value="data ? balanceRows[1]!.total : null"
+            size="md"
+            :hint="'包含年度額外開銷' + (footer.extra ? ' ' + money(footer.extra) : '')"
+          />
+        </div>
         <div class="md:pl-5 md:border-l">
           <MetricStat
             label="已記錄月份"
@@ -239,9 +275,10 @@ onMounted(async () => {
             </span>
           </div>
 
-          <!-- 底部支出合計列（白底） -->
+          <!-- 底部合計：收入合計 → 支出合計 → 月結餘（對應試算表的順序） -->
+          <div class="flex flex-col">
           <div
-            class="grid items-center h-[52px] bg-surface border-t text-[12.5px]"
+            class="order-2 grid items-center h-[52px] bg-surface border-t text-[12.5px]"
             :style="{ gridTemplateColumns: '150px repeat(12,minmax(72px,1fr)) 88px 108px 100px 96px 92px' }"
           >
             <span
@@ -260,12 +297,66 @@ onMounted(async () => {
             </span>
             <span class="text-right pr-4 font-mono text-[11px] text-fg-3">100.0%</span>
           </div>
+
+          <div
+            v-for="b in balanceRows"
+            :key="b.label"
+            class="grid items-center h-[52px] bg-surface border-t text-[12.5px]"
+            :class="b.signed ? 'order-3' : 'order-1'"
+            :style="{ gridTemplateColumns: '150px repeat(12,minmax(72px,1fr)) 88px 108px 100px 96px 92px' }"
+          >
+            <span
+              class="sticky left-0 z-[2] h-[52px] flex items-center px-4 bg-surface box-border shadow-[1px_0_0_rgba(0,0,0,.09)] font-bold text-fg-1"
+            >
+              {{ b.label }}
+            </span>
+            <span
+              v-for="(v, i) in b.months"
+              :key="i"
+              class="text-right pr-1 font-mono tnum"
+              :class="b.signed ? netClass(v) : 'text-fg-2'"
+            >
+              {{ v === null ? "—" : money(v) }}
+            </span>
+            <span class="text-right pr-1 font-mono tnum" :class="b.extra === null ? 'text-fg-4' : netClass(b.extra)">
+              {{ b.extra === null ? "—" : money(b.extra) }}
+            </span>
+            <span class="text-right pr-1 font-bold tnum" :class="b.signed ? netClass(b.total) : 'text-fg-1'">
+              {{ money(b.total) }}
+            </span>
+            <span class="text-right pr-1 font-mono tnum text-fg-4">—</span>
+            <span class="text-right pr-1 font-mono tnum" :class="b.signed ? netClass(b.total) : 'text-fg-3'">
+              {{ b.avg(b.total) }}
+            </span>
+            <span class="text-right pr-4 font-mono text-[11px] text-fg-4">—</span>
+          </div>
+          </div>
         </div>
       </div>
     </AppCard>
 
     <!-- 手機：每分類卡片 + 可橫捲的 12 月數字帶 -->
     <div class="md:hidden flex flex-col gap-3.5">
+      <AppCard v-if="data" pad="compact">
+        <div class="flex items-center gap-2">
+          <span class="text-[14.5px] font-bold text-fg-1">月結餘</span>
+          <span class="ml-auto text-[16px] font-bold tnum" :class="netClass(balanceRows[1]!.total)">
+            年度結餘 {{ money(balanceRows[1]!.total) }}
+          </span>
+        </div>
+        <div class="mt-3 pt-3 border-t overflow-x-auto">
+          <div class="flex gap-3 min-w-max">
+            <span v-for="(m, i) in data.monthly" :key="i" class="flex flex-col items-end gap-0.5">
+              <span class="font-mono text-[10px] text-fg-4">{{ i + 1 }}月</span>
+              <span class="font-mono text-[12px] tnum" :class="netClass(m?.net ?? null)">
+                {{ m === null ? "—" : money(m.net) }}
+              </span>
+              <span class="font-mono text-[10px] text-fg-4 tnum">收 {{ m === null ? "—" : money(m.income) }}</span>
+              <span class="font-mono text-[10px] text-fg-4 tnum">支 {{ m === null ? "—" : money(m.expense) }}</span>
+            </span>
+          </div>
+        </div>
+      </AppCard>
       <AppCard v-for="row in data?.rows ?? []" :key="row.mainCategoryId" pad="compact">
         <div class="flex items-center gap-2">
           <span class="text-[14.5px] font-bold text-fg-1">{{ row.name }}</span>
@@ -306,28 +397,6 @@ onMounted(async () => {
         <span class="text-right text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
         <span class="flex justify-end">
           <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e.id, e.name)" />
-        </span>
-      </div>
-    </AppCard>
-
-    <!-- 成員年度花費：共用一條長條，以顏色區分 -->
-    <AppCard>
-      <div class="flex items-baseline gap-2.5 flex-wrap">
-        <div class="text-section font-bold text-fg-1">成員年度花費</div>
-        <div class="text-[11.5px] text-fg-3">依每一筆交易的記帳者加總 · 含年度額外開銷</div>
-      </div>
-      <div class="mt-4 flex h-2.5 rounded-pill overflow-hidden bg-track">
-        <span
-          v-for="(m, i) in data?.byMember ?? []"
-          :key="m.memberId"
-          :class="i === 0 ? 'bg-brand' : 'bg-budget-ok'"
-          :style="{ width: (m.amount / (memberTotal || 1)) * 100 + '%' }"
-        />
-      </div>
-      <div class="mt-2.5 flex justify-between text-[12px] text-fg-2">
-        <span v-for="(m, i) in data?.byMember ?? []" :key="m.memberId" :class="i > 0 && 'text-right'">
-          {{ m.name }} <span class="tnum font-medium">{{ money(m.amount) }}</span>
-          <span class="text-[10.5px] text-fg-4"> · {{ m.count }} 筆</span>
         </span>
       </div>
     </AppCard>

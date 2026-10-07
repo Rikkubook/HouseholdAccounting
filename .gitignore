@@ -7,6 +7,8 @@ dist-ssr/
 # 機密：真實連線字串與金鑰，絕不進版控
 api/.env
 api/.env.*.local
+# 強制匯入前備份的正式資料
+api/backups/
 
 # 編輯器/系統
 .DS_Store

@@ -97,9 +97,15 @@ export async function buildDashboard(month: string): Promise<DashboardPayload> {
   const scheduledMap = new Map(scheduledByCategory.map((r) => [r.mainCategoryId, r.amount]));
   const budgetMap = new Map(monthBudgets.map((b) => [b.mainCategoryId, b.amount]));
 
-  /** 只列該月存在的浮動支出分類；已停用分類在未來月份不出現，不以 0 呈現。 */
+  /**
+   * 只列該月存在的浮動支出分類；已停用分類在未來月份不出現，不以 0 呈現。
+   * 但該月有實際花費（或預定支出）的分類一律列出，不因生命週期被藏起來。
+   */
   const visible = categories.filter(
-    (c) => c.type === "expense" && c.nature === "floating" && existsInMonth(c, month)
+    (c) =>
+      c.type === "expense" &&
+      c.nature === "floating" &&
+      (existsInMonth(c, month) || spentMap.has(c.id) || scheduledMap.has(c.id))
   );
 
   /** monthRows 已依日期新到舊排序，逐筆分桶即為各分類的「最近交易」。 */

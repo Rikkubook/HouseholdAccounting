@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, lt, lte, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { TransactionView } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { members, transactions } from "../db/schema.js";
@@ -9,7 +10,10 @@ import { txScope } from "./scope.js";
  * TransactionView 的分類名稱取自記帳當下的快照，不 join 分類表——
  * 分類日後改名不改動歷史紀錄的顯示（specs/13 待確認 1 已定案）。
  * 成員名稱仍然 join：成員改名是同一人換稱呼，不是換人。
+ * 輸入者另外 left join（null = 系統自動產生），管理者代記時才看得出是誰輸入的。
  */
+const creators = alias(members, "creators");
+
 const viewColumns = {
   id: transactions.id,
   type: transactions.type,
@@ -22,15 +26,21 @@ const viewColumns = {
   createdAt: transactions.createdAt,
   isDeleted: transactions.isDeleted,
   sourceSubscriptionId: transactions.sourceSubscriptionId,
+  createdBy: transactions.createdBy,
   mainCategoryName: transactions.mainCategoryName,
   subCategoryName: transactions.subCategoryName,
   payerName: members.name,
+  createdByName: creators.name,
 };
 
 type ViewRow = Awaited<ReturnType<typeof transactionViewQuery>>[number];
 
 export const transactionViewQuery = () =>
-  db.select(viewColumns).from(transactions).innerJoin(members, eq(members.id, transactions.payerId));
+  db
+    .select(viewColumns)
+    .from(transactions)
+    .innerJoin(members, eq(members.id, transactions.payerId))
+    .leftJoin(creators, eq(creators.id, transactions.createdBy));
 
 export const toView = (row: ViewRow): TransactionView => ({
   ...row,
@@ -67,8 +77,6 @@ export async function recentByCategory(
 
 export const intSum = (column: typeof transactions.amount) =>
   sql<number>`coalesce(sum(${column}), 0)::int`;
-
-export const countAll = () => sql<number>`count(*)::int`;
 
 /**
  * 未來日期的交易不計入任何彙總，等日期到達當天才計入（specs/04 規則 9）。

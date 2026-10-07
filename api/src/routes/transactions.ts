@@ -12,10 +12,10 @@ import {
   type TransactionView,
 } from "@family-ledger/shared";
 import { db } from "../db/index.js";
-import { mainCategories, subCategories, transactionRevisions, transactions } from "../db/schema.js";
+import { mainCategories, members, subCategories, transactionRevisions, transactions } from "../db/schema.js";
 import { badRequest, forbidden, notFound } from "../lib/errors.js";
 import { monthRange } from "../lib/dates.js";
-import { requireAuth, type AppEnv } from "../middleware/auth.js";
+import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
 import { findView, toView, transactionViewQuery } from "../services/views.js";
 import { txScope } from "../services/scope.js";
 
@@ -58,9 +58,15 @@ transactionRoutes.get("/", zValidator("query", transactionQuerySchema), async (c
   return c.json(payload);
 });
 
-/** 記帳者由後端取登入者，不接受前端傳入（不可代記他人）。 */
+/**
+ * 記帳者省略時為登入者本人；指定他人僅限管理者（代記），且須為啟用中的成員。
+ * 實際輸入者一律記在 createdBy。
+ */
 transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c) => {
   const draft = c.req.valid("json");
+  const user = c.get("user");
+  const payerId = draft.payerId ?? user.id;
+  if (payerId !== user.id) await assertCanAssignPayer(user, payerId);
   const names = await assertCategoryMatches(draft.type, draft.mainCategoryId, draft.subCategoryId);
 
   const [row] = await db
@@ -71,7 +77,8 @@ transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c
       subCategoryId: draft.subCategoryId,
       amount: draft.amount,
       date: draft.date,
-      payerId: c.get("user").id,
+      payerId,
+      createdBy: user.id,
       note: draft.note ?? null,
       // 分類名稱在此凍結，日後改名不影響這筆
       mainCategoryName: names.main,
@@ -84,8 +91,9 @@ transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c
 });
 
 /**
- * 可改欄位僅金額、日期、分類、備註；收支別與記帳者不可改。
- * 一般成員只能改自己記的交易，管理者不受此限。每個異動欄位寫一列 revision。
+ * 可改欄位：金額、日期、分類、備註、記帳者；收支別不可改。
+ * 一般成員只能改自己記的交易，管理者不受此限。記帳者僅管理者可換，
+ * 且訂閱產生的交易（要換請改訂閱扣款人）與個人帳交易不可換。每個異動欄位寫一列 revision。
  */
 transactionRoutes.patch("/:id", idParam, zValidator("json", transactionPatchSchema), async (c) => {
   const { id } = c.req.valid("param");
@@ -96,11 +104,18 @@ transactionRoutes.patch("/:id", idParam, zValidator("json", transactionPatchSche
   if (!current || current.isDeleted) throw notFound("交易不存在");
   if (user.role !== "admin" && current.payerId !== user.id) throw forbidden("只能修改自己記的交易");
 
+  if (patch.payerId !== undefined && patch.payerId !== current.payerId) {
+    if (current.sourceSubscriptionId != null) throw badRequest("訂閱產生的交易不可更換記帳者，請改訂閱的扣款人");
+    // 個人帳的 owner_id 必須等於 payer_id（sql/0002 的 check），換人等於把帳搬到別人的個人帳
+    if (current.ownerId != null) throw badRequest("個人帳交易不可更換記帳者");
+    await assertCanAssignPayer(user, patch.payerId);
+  }
+
   const nextMain = patch.mainCategoryId === undefined ? current.mainCategoryId : patch.mainCategoryId;
   const nextSub = patch.subCategoryId === undefined ? current.subCategoryId : patch.subCategoryId;
   const names = await assertCategoryMatches(current.type, nextMain, nextSub);
 
-  const fields = ["mainCategoryId", "subCategoryId", "amount", "date", "note"] as const;
+  const fields = ["mainCategoryId", "subCategoryId", "amount", "date", "note", "payerId"] as const;
   const diffs = fields
     .filter((f) => patch[f] !== undefined && String(patch[f] ?? "") !== String(current[f] ?? ""))
     .map((f) => ({
@@ -159,6 +174,17 @@ transactionRoutes.get("/:id/revisions", idParam, async (c) => {
   const payload: TransactionRevision[] = rows.map((r) => ({ ...r, editedAt: r.editedAt.toISOString() }));
   return c.json(payload);
 });
+
+/** 把交易記在別人名下：僅管理者，且對象須為啟用中的成員。 */
+async function assertCanAssignPayer(user: AuthUser, payerId: number): Promise<void> {
+  if (user.role !== "admin") throw forbidden("只有管理者可以代記或更換記帳者");
+  const [payer] = await db
+    .select({ isActive: members.isActive })
+    .from(members)
+    .where(eq(members.id, payerId))
+    .limit(1);
+  if (!payer || !payer.isActive) throw badRequest("記帳者不存在或已停用");
+}
 
 /**
  * 分類須與收支別一致，子分類須隸屬該主分類（歸屬不可搬移）。

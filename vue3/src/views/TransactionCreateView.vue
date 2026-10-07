@@ -12,6 +12,7 @@ import InlineAlert from "@/components/base/InlineAlert.vue";
 import { transactionsApi } from "@/api/transactions";
 import { useAuthStore } from "@/stores/auth";
 import { useCategoriesStore } from "@/stores/categories";
+import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
 import { todayISO } from "@/utils/format";
 import type { TxType } from "@/types/models";
@@ -19,6 +20,7 @@ import type { TxType } from "@/types/models";
 const router = useRouter();
 const auth = useAuthStore();
 const cats = useCategoriesStore();
+const members = useMembersStore();
 const ui = useUiStore();
 
 const type = ref<TxType>("expense");
@@ -27,6 +29,8 @@ const subId = ref<number | null>(null);
 const amount = ref("");
 const date = ref(todayISO());
 const note = ref("");
+/** 管理者可代記他人；一般成員固定為本人 */
+const payerId = ref<number | null>(auth.user?.id ?? null);
 const error = ref("");
 const saving = ref(false);
 
@@ -65,6 +69,7 @@ async function submit() {
       amount: Number(amount.value),
       date: date.value,
       note: note.value.trim() || undefined,
+      payerId: auth.isAdmin && payerId.value ? payerId.value : undefined,
     });
     ui.flash("已記下一筆");
     // 儲存成功後回到交易列表，不停留連續記帳
@@ -76,13 +81,13 @@ async function submit() {
   }
 }
 
-onMounted(() => cats.load());
+onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefined]));
 </script>
 
 <template>
   <AppShell
     title="新增交易"
-    subtitle="記帳者自動帶入登入者"
+    :subtitle="auth.isAdmin ? '可代記其他成員的帳' : '記帳者自動帶入登入者'"
     back-to="/"
     :loading="cats.initialLoading"
     :error="cats.error"
@@ -148,7 +153,16 @@ onMounted(() => cats.load());
           />
         </FormField>
 
-        <div class="flex flex-col gap-[7px]">
+        <div v-if="auth.isAdmin" class="flex flex-col gap-[7px]">
+          <span class="text-label text-fg-3">記帳者</span>
+          <SegmentedControl
+            :options="members.active.map((m) => ({ value: String(m.id), label: m.name }))"
+            :model-value="String(payerId)"
+            @update:model-value="payerId = Number($event)"
+          />
+          <span class="text-[11px] text-fg-4">管理者可代記其他成員；系統會另外記下是你輸入的</span>
+        </div>
+        <div v-else class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">記帳者</span>
           <div class="flex items-center gap-2.5 flex-wrap">
             <span

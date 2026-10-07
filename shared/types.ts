@@ -112,7 +112,8 @@ export interface YearSummaryPayload {
   expense: number;
   net: number;
   recordedMonths: number;
+  /** 12 欄：每月收入、支出、結餘（不含年度額外開銷）；該月沒有交易為 null */
+  monthly: ({ income: number; expense: number; net: number } | null)[];
   rows: YearCategoryRow[];
   extras: (YearExtraExpense & { categoryName: string; payerName: string })[];
-  byMember: { memberId: number; name: string; amount: number; count: number }[];
 }
