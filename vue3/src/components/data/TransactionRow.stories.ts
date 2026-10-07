@@ -18,9 +18,11 @@ const base: TransactionView = {
   createdAt: "2026-09-03T09:10:00Z",
   isDeleted: false,
   sourceSubscriptionId: null,
+  createdBy: 2,
   mainCategoryName: "食",
   subCategoryName: "食材",
   payerName: "太太",
+  createdByName: "太太",
 };
 
 const meta = {

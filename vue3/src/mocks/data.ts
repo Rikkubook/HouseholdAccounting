@@ -13,7 +13,11 @@ export const members: Member[] = [
   { id: 2, name: "太太", account: "mom", role: "admin", isActive: true, color: "#2bb3d9", joinedMonth: "2025-01", resetCode: "980901" },
   { id: 3, name: "小妹", account: "sis", role: "member", isActive: true, color: "#f5b23c", joinedMonth: "2026-03", resetCode: null },
   { id: 4, name: "阿嬤", account: "grandma", role: "member", isActive: false, color: "#8b857c", joinedMonth: "2025-06", resetCode: null },
+  // 對應 api/src/db/force-import-2026.ts 的「系統」成員：停用、不能登入
+  { id: 5, name: "系統", account: "system", role: "member", isActive: false, color: "#8b857c", joinedMonth: "2026-01", resetCode: null },
 ];
+
+const SYSTEM_ID = 5;
 
 let sid = 100;
 const sub = (mainCategoryId: number, name: string, sortOrder: number) => ({
@@ -105,63 +109,47 @@ export const subscriptions: Subscription[] = [
 ];
 
 export const yearExtras: YearExtraExpense[] = [
-  { id: 1, year: 2026, name: "日本家庭旅遊", amount: 86000, mainCategoryId: 6, payerId: 2 },
-  { id: 2, year: 2026, name: "冷氣與冰箱更新", amount: 48000, mainCategoryId: 3, payerId: 1 },
-  { id: 3, year: 2026, name: "汽車大保養", amount: 32000, mainCategoryId: 4, payerId: 1 },
+  { id: 1, year: 2026, name: "健檢", amount: 9900, mainCategoryId: 5, payerId: SYSTEM_ID },
   { id: 4, year: 2025, name: "沙發與床墊", amount: 62000, mainCategoryId: 3, payerId: 1 },
 ];
 
 export const revisions: TransactionRevision[] = [];
 
-/** 產生一整年的交易；教育只從 8 月起、健康只到 6 月（對應分類生命週期）。 */
+/**
+ * 2026 年 1～9 月，與 api/src/db/force-import-2026.ts 的試算表相同：
+ * 每個項目每月一筆，日期為該月最後一天，金額 0 略過；記帳者為「系統」、created_by 為 null。
+ */
+const IMPORT_LINES: { label: string; cat: number; subIdx?: number; amounts: number[] }[] = [
+  { label: "薪資1", cat: 10, subIdx: 0, amounts: [15000, 15000, 15000, 15000, 15000, 15000, 15000, 15000, 15000] },
+  { label: "薪資2", cat: 10, subIdx: 0, amounts: [10000, 10001, 10000, 10000, 10000, 10000, 10000, 10000, 10000] },
+  { label: "其它收入", cat: 10, amounts: [31148, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { label: "食", cat: 1, amounts: [15073, 10891, 18540, 17542, 15081, 13390, 17790, 17717, 14464] },
+  { label: "健康", cat: 5, amounts: [3830, 0, 0, 100, 2488, 2928, 139, 6078, 9065] },
+  { label: "育", cat: 7, amounts: [0, 0, 0, 0, 1410, 0, 330, 0, 600] },
+  { label: "樂", cat: 6, amounts: [12664, 660, 9385, 8379, 2536, 5681, 4585, 0, 10332] },
+  { label: "網路", cat: 9, amounts: [1299, 1299, 1299, 1299, 1299, 1299, 1099, 1299, 1299] },
+];
+
 function seedTransactions(): Transaction[] {
   const out: Transaction[] = [];
   let id = 0;
-  const plan: { cat: number; subIdx: number; base: number; payer: number }[] = [
-    { cat: 1, subIdx: 3, base: 1480, payer: 2 },
-    { cat: 1, subIdx: 0, base: 320, payer: 1 },
-    { cat: 3, subIdx: 0, base: 22000, payer: 1 },
-    { cat: 3, subIdx: 1, base: 2860, payer: 1 },
-    { cat: 4, subIdx: 0, base: 1500, payer: 1 },
-    { cat: 6, subIdx: 2, base: 2100, payer: 2 },
-    { cat: 2, subIdx: 0, base: 1880, payer: 2 },
-    { cat: 5, subIdx: 0, base: 1200, payer: 2 },
-    { cat: 7, subIdx: 0, base: 1600, payer: 2 },
-    { cat: 8, subIdx: 0, base: 3200, payer: 1 },
-  ];
   for (let m = 1; m <= 9; m++) {
-    const mm = String(m).padStart(2, "0");
-    plan.forEach((p, i) => {
-      if (p.cat === 7 && m < 8) return; // 教育 8 月才新增
-      if (p.cat === 5 && m >= 7) return; // 健康 7 月起停用
-      const day = String(Math.min(28, 3 + i * 3)).padStart(2, "0");
-      const cat = categories.find((c) => c.id === p.cat)!;
+    const date = new Date(Date.UTC(2026, m, 0)).toISOString().slice(0, 10);
+    IMPORT_LINES.forEach((line) => {
+      const amount = line.amounts[m - 1];
+      if (!amount) return;
+      const cat = categories.find((c) => c.id === line.cat)!;
       out.push({
         id: ++id,
-        type: "expense",
-        mainCategoryId: p.cat,
-        subCategoryId: cat.subCategories[p.subIdx]?.id ?? null,
-        amount: Math.round((p.base * (0.85 + ((m * 7 + i * 3) % 30) / 100)) / 10) * 10,
-        date: "2026-" + mm + "-" + day,
-        payerId: p.payer,
-        note: i === 0 ? "週末採買" : null,
-        createdAt: "2026-" + mm + "-" + day + "T09:" + String(10 + i).padStart(2, "0") + ":00Z",
-        isDeleted: false,
-        sourceSubscriptionId: null,
-      });
-    });
-    // 每月薪資
-    [1, 2].forEach((payer, k) => {
-      out.push({
-        id: ++id,
-        type: "income",
-        mainCategoryId: 10,
-        subCategoryId: categories.find((c) => c.id === 10)!.subCategories[0].id,
-        amount: k === 0 ? 92000 : 76500,
-        date: "2026-" + mm + "-05",
-        payerId: payer,
-        note: null,
-        createdAt: "2026-" + mm + "-05T08:00:00Z",
+        type: cat.type,
+        mainCategoryId: cat.id,
+        subCategoryId: line.subIdx == null ? null : cat.subCategories[line.subIdx].id,
+        amount,
+        date,
+        payerId: SYSTEM_ID,
+        createdBy: null,
+        note: cat.name + "（系統匯入）",
+        createdAt: date + "T00:00:00Z",
         isDeleted: false,
         sourceSubscriptionId: null,
       });

@@ -96,6 +96,8 @@ export const transactionSchema = z.object({
   createdAt: z.string(),
   isDeleted: z.boolean(),
   sourceSubscriptionId: z.number().int().nullable(),
+  /** 實際輸入者；null = 系統自動產生（Cron 訂閱扣款） */
+  createdBy: z.number().int().nullable(),
 });
 
 export const transactionViewSchema = transactionSchema.extend({
@@ -103,6 +105,7 @@ export const transactionViewSchema = transactionSchema.extend({
   mainCategoryName: z.string().nullable(),
   subCategoryName: z.string().nullable(),
   payerName: z.string(),
+  createdByName: z.string().nullable(),
 });
 
 export const transactionRevisionSchema = z.object({
@@ -176,9 +179,14 @@ export const transactionDraftSchema = z.object({
   /** 可為未來日期（預定支出） */
   date: dateSchema,
   note: z.string().max(100).optional(),
+  /** 記帳者；省略＝登入者本人。指定他人僅限管理者，且須為啟用中的成員。 */
+  payerId: z.number().int().positive().optional(),
 });
 
-/** 可修改欄位僅：金額、日期、分類、備註（specs/05-交易列表頁.md 規則 5、6）。 */
+/**
+ * 可修改欄位：金額、日期、分類、備註、記帳者；收支別不可改（specs/05-交易列表頁.md 規則 5、6）。
+ * 記帳者僅管理者可改，訂閱產生的交易與個人帳交易不可改。
+ */
 export const transactionPatchSchema = z
   .object({
     mainCategoryId: z.number().int().positive().nullable(),
@@ -186,6 +194,7 @@ export const transactionPatchSchema = z
     amount: amountSchema,
     date: dateSchema,
     note: z.string().max(100).nullable(),
+    payerId: z.number().int().positive(),
   })
   .partial()
   .refine((v) => Object.keys(v).length > 0, "沒有要修改的欄位");

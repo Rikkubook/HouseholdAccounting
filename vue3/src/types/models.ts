@@ -55,7 +55,7 @@ export interface Transaction {
   amount: number;
   /** YYYY-MM-DD，可為未來日期（預定支出） */
   date: string;
-  /** 記帳者＝新增當下的登入者，不可代記他人 */
+  /** 記帳者：一般成員只能是自己；管理者可代記他人、可事後更換（訂閱產生的交易除外） */
   payerId: number;
   note: string | null;
   createdAt: string;
@@ -63,6 +63,8 @@ export interface Transaction {
   isDeleted: boolean;
   /** 由訂閱自動產生時記錄來源 */
   sourceSubscriptionId: number | null;
+  /** 實際輸入者；null = 系統自動產生（Cron 訂閱扣款） */
+  createdBy: number | null;
 }
 
 export interface TransactionRevision {
@@ -82,6 +84,8 @@ export interface TransactionDraft {
   amount: number;
   date: string;
   note?: string;
+  /** 省略＝登入者本人；指定他人僅限管理者 */
+  payerId?: number;
 }
 
 export interface TransactionPatch {
@@ -90,6 +94,8 @@ export interface TransactionPatch {
   amount?: number;
   date?: string;
   note?: string | null;
+  /** 僅管理者可改 */
+  payerId?: number;
 }
 
 export interface Budget {
@@ -152,6 +158,7 @@ export interface TransactionView extends Transaction {
   mainCategoryName: string | null;
   subCategoryName: string | null;
   payerName: string;
+  createdByName: string | null;
 }
 
 export interface LoginResponse {

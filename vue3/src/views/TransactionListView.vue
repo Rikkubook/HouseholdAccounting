@@ -37,6 +37,7 @@ const editDate = ref("");
 const editNote = ref("");
 const editMainId = ref<number | null>(null);
 const editSubId = ref<number | null>(null);
+const editPayerId = ref<number | null>(null);
 
 const typeOptions = [
   { value: "all", label: "全部" },
@@ -68,6 +69,29 @@ const editSubOptions = computed(() => {
   return original && !active.some((sub) => sub.id === original.id) ? [...active, original] : active;
 });
 
+/** 記帳者僅管理者可換；訂閱產生的交易要換請改訂閱的扣款人。 */
+const canChangePayer = computed(() => auth.isAdmin && editing.value?.sourceSubscriptionId == null);
+const payerLockedNote = computed(() =>
+  editing.value?.sourceSubscriptionId != null ? "訂閱產生的交易不可更換，請改訂閱的扣款人" : "只有管理者可以更換"
+);
+
+/** 啟用中的成員；原記帳者若已停用也保留在選單裡（不改就不會送出），不會變空白。 */
+const editPayerOptions = computed(() => {
+  const tx = editing.value;
+  if (!tx) return [];
+  const options = members.active.map((m) => ({ id: m.id, label: m.name }));
+  return options.some((o) => o.id === tx.payerId)
+    ? options
+    : [...options, { id: tx.payerId, label: tx.payerName + "（已停用）" }];
+});
+
+/** 輸入者與記帳者不同（管理者代記）時，在編輯視窗註明是誰輸入的。 */
+const createdByNote = computed(() => {
+  const tx = editing.value;
+  if (!tx || tx.createdBy == null || tx.createdBy === tx.payerId) return undefined;
+  return "由 " + (tx.createdByName ?? "—") + " 代記";
+});
+
 function pickEditMain(id: number | null) {
   editMainId.value = id;
   editSubId.value = null; // 換主分類就重選子分類（子分類不可跨主分類搬移）
@@ -80,6 +104,7 @@ function openEdit(tx: TransactionView) {
   editNote.value = tx.note ?? "";
   editMainId.value = tx.mainCategoryId;
   editSubId.value = tx.subCategoryId;
+  editPayerId.value = tx.payerId;
 }
 
 async function saveEdit() {
@@ -90,12 +115,14 @@ async function saveEdit() {
 
   // 分類有改才送：後端收到分類欄位就會重寫分類名稱快照
   const categoryChanged = editMainId.value !== tx.mainCategoryId || editSubId.value !== tx.subCategoryId;
+  const payerChanged = editPayerId.value != null && editPayerId.value !== tx.payerId;
   try {
     await store.update(tx.id, {
       amount: Number(editAmount.value),
       date: editDate.value,
       note: editNote.value.trim() || null,
       ...(categoryChanged ? { mainCategoryId: editMainId.value, subCategoryId: editSubId.value } : {}),
+      ...(payerChanged ? { payerId: editPayerId.value! } : {}),
     });
   } catch (e) {
     return ui.flash(normalizeError(e).message, "danger");
@@ -235,7 +262,7 @@ onMounted(async () => {
     <AppDialog
       :open="!!editing"
       title="編輯交易"
-      subtitle="收支別與記帳者不可修改；每次修改都會留下紀錄"
+      :subtitle="auth.isAdmin ? '收支別不可修改；每次修改都會留下紀錄' : '收支別與記帳者不可修改；每次修改都會留下紀錄'"
       @close="editing = null"
     >
       <FormField label="金額"><AmountInput v-model="editAmount" /></FormField>
@@ -270,7 +297,15 @@ onMounted(async () => {
         </select>
       </FormField>
       <FormField label="備註"><TextInput v-model="editNote" placeholder="例如：週末採買" /></FormField>
-      <FormField label="記帳者" readonly-note="不可修改">
+      <FormField v-if="canChangePayer" label="記帳者" :hint="createdByNote">
+        <select
+          v-model.number="editPayerId"
+          class="h-[46px] px-2.5 rounded-lg border border-strong bg-surface text-[15px] text-fg-1 outline-none"
+        >
+          <option v-for="o in editPayerOptions" :key="o.id" :value="o.id">{{ o.label }}</option>
+        </select>
+      </FormField>
+      <FormField v-else label="記帳者" :hint="createdByNote" :readonly-note="payerLockedNote">
         <TextInput :model-value="editing?.payerName ?? ''" readonly />
       </FormField>
 

@@ -26,7 +26,16 @@ function view(tx: Transaction): TransactionView {
     mainCategoryName: cat?.name ?? null,
     subCategoryName: sub?.name ?? null,
     payerName: db.members.find((m) => m.id === tx.payerId)?.name ?? "—",
+    createdByName: tx.createdBy == null ? null : db.members.find((m) => m.id === tx.createdBy)?.name ?? "—",
   };
+}
+
+/** 與後端一致：把交易記在別人名下僅限管理者，且對象須為啟用中的成員 */
+function assertCanAssignPayer(payerId: number) {
+  const me = db.members.find((x) => x.id === currentUserId)!;
+  if (me.role !== "admin") throw { code: "forbidden", message: "只有管理者可以代記或更換記帳者" };
+  const payer = db.members.find((x) => x.id === payerId);
+  if (!payer || !payer.isActive) throw { code: "bad_request", message: "記帳者不存在或已停用" };
 }
 
 const live = () => db.transactions.filter((t) => !t.isDeleted);
@@ -154,11 +163,13 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     };
   }],
   [/^\/transactions$/, "post", (_m, body) => {
-    // 記帳者恆為登入者
+    // 記帳者省略＝登入者；管理者可代記他人，輸入者一律是登入者
+    const payerId = body.payerId ?? currentUserId;
+    if (payerId !== currentUserId) assertCanAssignPayer(payerId);
     const tx: Transaction = {
       id: ++seq, type: body.type, mainCategoryId: body.mainCategoryId,
       subCategoryId: body.subCategoryId, amount: body.amount, date: body.date,
-      payerId: currentUserId, note: body.note ?? null,
+      payerId, createdBy: currentUserId, note: body.note ?? null,
       createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: null,
     };
     db.transactions.push(tx);
@@ -170,7 +181,13 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     if (member.role !== "admin" && tx.payerId !== currentUserId) {
       throw { code: "forbidden", message: "只能編輯自己記的交易" };
     }
-    // 收支別與記帳者不可修改；每個欄位變更寫入 revision
+    if (body.payerId !== undefined && body.payerId !== tx.payerId) {
+      if (tx.sourceSubscriptionId != null) {
+        throw { code: "bad_request", message: "訂閱產生的交易不可更換記帳者，請改訂閱的扣款人" };
+      }
+      assertCanAssignPayer(body.payerId);
+    }
+    // 收支別不可修改；每個欄位變更寫入 revision
     for (const [field, after] of Object.entries(body)) {
       const before = (tx as never as Record<string, unknown>)[field];
       if (before === after) continue;
@@ -185,6 +202,10 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/transactions\/(\d+)$/, "delete", (m) => {
     const tx = db.transactions.find((t) => t.id === Number(m[1]))!;
+    const member = db.members.find((x) => x.id === currentUserId)!;
+    if (member.role !== "admin" && tx.payerId !== currentUserId) {
+      throw { code: "forbidden", message: "只能刪除自己記的交易" };
+    }
     tx.isDeleted = true; // 軟刪除，前台無復原入口
     return null;
   }],
@@ -246,7 +267,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     const s = db.subscriptions.find((x) => x.id === Number(m[1]))!;
     const tx: Transaction = {
       id: ++seq, type: "expense", mainCategoryId: s.mainCategoryId, subCategoryId: null,
-      amount: s.amount, date: s.nextChargeDate, payerId: s.payerId,
+      amount: s.amount, date: s.nextChargeDate, payerId: s.payerId, createdBy: currentUserId,
       note: s.name, createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: s.id,
     };
     db.transactions.push(tx);
@@ -388,16 +409,24 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
         rows.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0) -
         rows.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0),
       recordedMonths,
+      monthly: Array.from({ length: 12 }, (_, i) => {
+        const mm = String(i + 1).padStart(2, "0");
+        const inM = rows.filter((t) => t.date.slice(5, 7) === mm);
+        if (!inM.length) return null;
+        const income = inM.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
+        const expense = inM.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+        return { income, expense, net: income - expense };
+      }),
       rows: cats.map((c) => {
         const startMonth = monthIndex(c.activeFrom, 0);
         const endMonth = c.archivedFrom ? monthIndex(c.archivedFrom, 12) : 12;
         const months = Array.from({ length: 12 }, (_, i) => {
-          if (i < startMonth || i >= endMonth) return null; // 分類當時不存在或已停用
           if (i >= recordedMonths) return null; // 尚未記錄
           const mm = String(i + 1).padStart(2, "0");
-          return rows
-            .filter((t) => t.mainCategoryId === c.id && t.date.slice(5, 7) === mm)
-            .reduce((s, t) => s + t.amount, 0);
+          const mine = rows.filter((t) => t.mainCategoryId === c.id && t.date.slice(5, 7) === mm);
+          // 與後端一致：有實際交易就顯示，即使分類當時不存在或已停用
+          if (!mine.length && (i < startMonth || i >= endMonth)) return null;
+          return mine.reduce((s, t) => s + t.amount, 0);
         });
         const extra = db.yearExtras
           .filter((e) => e.year === year && e.mainCategoryId === c.id)
@@ -417,16 +446,6 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
         categoryName: db.categories.find((c) => c.id === e.mainCategoryId)?.name ?? "—",
         payerName: db.members.find((m) => m.id === e.payerId)?.name ?? "—",
       })),
-      // 依每一筆交易的記帳者加總，年度額外開銷也帶記帳者一併計入
-      byMember: db.members.filter((m) => m.isActive).map((m) => {
-        const mine = rows.filter((t) => t.type === "expense" && t.payerId === m.id);
-        const extras = db.yearExtras.filter((e) => e.year === year && e.payerId === m.id);
-        return {
-          memberId: m.id, name: m.name,
-          amount: mine.reduce((s, t) => s + t.amount, 0) + extras.reduce((s, e) => s + e.amount, 0),
-          count: mine.length + extras.length,
-        };
-      }).filter((r) => r.amount > 0),
     };
   }],
   [/^\/summary\/year-extras$/, "post", (_m, body) => {

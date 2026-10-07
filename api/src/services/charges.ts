@@ -9,8 +9,9 @@ export type ChargeResult = { subscriptionId: number; name: string; amount: numbe
  * 為單筆訂閱產生扣款交易並推進 nextChargeDate。
  * mark-paid（手動）與 run-due（Cron）共用同一條路徑，避免兩套邏輯漂移。
  * sourceSubscriptionId + date 的 unique index 是冪等保證：同一期重複執行不會產生第二筆。
+ * createdBy：手動 mark-paid 傳操作的管理者；Cron 不傳（null = 系統自動產生）。
  */
-export async function chargeOnce(subscriptionId: number): Promise<ChargeResult | null> {
+export async function chargeOnce(subscriptionId: number, createdBy: number | null = null): Promise<ChargeResult | null> {
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, subscriptionId)).limit(1);
   if (!sub || !sub.isActive) return null;
 
@@ -30,6 +31,7 @@ export async function chargeOnce(subscriptionId: number): Promise<ChargeResult |
         amount: sub.amount,
         date: sub.nextChargeDate,
         payerId: sub.payerId,
+        createdBy,
         note: sub.name,
         sourceSubscriptionId: sub.id,
         mainCategoryName: cat?.name ?? null,

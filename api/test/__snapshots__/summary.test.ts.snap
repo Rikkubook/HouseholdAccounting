@@ -54,6 +54,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 360,
           "createdAt": "2026-08-06T09:11:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-08-06",
           "id": 78,
           "isDeleted": false,
@@ -70,6 +72,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 1640,
           "createdAt": "2026-08-03T09:10:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-08-03",
           "id": 77,
           "isDeleted": false,
@@ -96,6 +100,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 1860,
           "createdAt": "2026-08-21T09:16:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-08-21",
           "id": 83,
           "isDeleted": false,
@@ -122,6 +128,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 2570,
           "createdAt": "2026-08-12T09:13:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-08-12",
           "id": 80,
           "isDeleted": false,
@@ -138,6 +146,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 19140,
           "createdAt": "2026-08-09T09:12:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-08-09",
           "id": 79,
           "isDeleted": false,
@@ -164,6 +174,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 1400,
           "createdAt": "2026-08-15T09:14:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-08-15",
           "id": 81,
           "isDeleted": false,
@@ -190,6 +202,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 2020,
           "createdAt": "2026-08-18T09:15:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-08-18",
           "id": 82,
           "isDeleted": false,
@@ -216,6 +230,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
         {
           "amount": 1680,
           "createdAt": "2026-08-27T09:18:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-08-27",
           "id": 84,
           "isDeleted": false,
@@ -247,6 +263,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
     {
       "amount": 3460,
       "createdAt": "2026-08-28T09:19:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-08-28",
       "id": 85,
       "isDeleted": false,
@@ -263,6 +281,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
     {
       "amount": 1680,
       "createdAt": "2026-08-27T09:18:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-08-27",
       "id": 84,
       "isDeleted": false,
@@ -279,6 +299,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
     {
       "amount": 1860,
       "createdAt": "2026-08-21T09:16:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-08-21",
       "id": 83,
       "isDeleted": false,
@@ -295,6 +317,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
     {
       "amount": 2020,
       "createdAt": "2026-08-18T09:15:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-08-18",
       "id": 82,
       "isDeleted": false,
@@ -311,6 +335,8 @@ exports[`GET /summary/dashboard > 上月（8 月） 1`] = `
     {
       "amount": 1400,
       "createdAt": "2026-08-15T09:14:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-08-15",
       "id": 81,
       "isDeleted": false,
@@ -348,6 +374,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 290,
           "createdAt": "2026-09-06T09:11:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-09-06",
           "id": 89,
           "isDeleted": false,
@@ -364,6 +392,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 1300,
           "createdAt": "2026-09-03T09:10:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-09-03",
           "id": 88,
           "isDeleted": false,
@@ -390,6 +420,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 1990,
           "createdAt": "2026-09-21T09:16:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-09-21",
           "id": 94,
           "isDeleted": false,
@@ -416,6 +448,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 2770,
           "createdAt": "2026-09-12T09:13:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-09-12",
           "id": 91,
           "isDeleted": false,
@@ -432,6 +466,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 20680,
           "createdAt": "2026-09-09T09:12:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-09-09",
           "id": 90,
           "isDeleted": false,
@@ -458,6 +494,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 1500,
           "createdAt": "2026-09-15T09:14:00.000Z",
+          "createdBy": 1,
+          "createdByName": "先生",
           "date": "2026-09-15",
           "id": 92,
           "isDeleted": false,
@@ -484,6 +522,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 2160,
           "createdAt": "2026-09-18T09:15:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-09-18",
           "id": 93,
           "isDeleted": false,
@@ -510,6 +550,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
         {
           "amount": 1790,
           "createdAt": "2026-09-27T09:18:00.000Z",
+          "createdBy": 2,
+          "createdByName": "太太",
           "date": "2026-09-27",
           "id": 95,
           "isDeleted": false,
@@ -541,6 +583,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
     {
       "amount": 2720,
       "createdAt": "2026-09-28T09:19:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-28",
       "id": 96,
       "isDeleted": false,
@@ -557,6 +601,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
     {
       "amount": 1790,
       "createdAt": "2026-09-27T09:18:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-27",
       "id": 95,
       "isDeleted": false,
@@ -573,6 +619,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
     {
       "amount": 1990,
       "createdAt": "2026-09-21T09:16:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-21",
       "id": 94,
       "isDeleted": false,
@@ -589,6 +637,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
     {
       "amount": 2160,
       "createdAt": "2026-09-18T09:15:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-18",
       "id": 93,
       "isDeleted": false,
@@ -605,6 +655,8 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
     {
       "amount": 1500,
       "createdAt": "2026-09-15T09:14:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-15",
       "id": 92,
       "isDeleted": false,
@@ -931,20 +983,6 @@ exports[`GET /summary/stats > 月統計 · 只看先生 1`] = `
 
 exports[`GET /summary/year > 2026 年度彙整 1`] = `
 {
-  "byMember": [
-    {
-      "amount": 263560,
-      "count": 44,
-      "memberId": 1,
-      "name": "先生",
-    },
-    {
-      "amount": 53900,
-      "count": 32,
-      "memberId": 2,
-      "name": "太太",
-    },
-  ],
   "expense": 317460,
   "extras": [
     {
@@ -979,6 +1017,56 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
     },
   ],
   "income": 1516500,
+  "monthly": [
+    {
+      "expense": 36200,
+      "income": 168500,
+      "net": 132300,
+    },
+    {
+      "expense": 37830,
+      "income": 168500,
+      "net": 130670,
+    },
+    {
+      "expense": 38450,
+      "income": 168500,
+      "net": 130050,
+    },
+    {
+      "expense": 34320,
+      "income": 168500,
+      "net": 134180,
+    },
+    {
+      "expense": 35460,
+      "income": 168500,
+      "net": 133040,
+    },
+    {
+      "expense": 37100,
+      "income": 168500,
+      "net": 131400,
+    },
+    {
+      "expense": 37430,
+      "income": 168500,
+      "net": 131070,
+    },
+    {
+      "expense": 34130,
+      "income": 168500,
+      "net": 134370,
+    },
+    {
+      "expense": 26540,
+      "income": 168500,
+      "net": 141960,
+    },
+    null,
+    null,
+    null,
+  ],
   "net": 1199040,
   "recordedMonths": 9,
   "rows": [
@@ -1193,6 +1281,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 2720,
       "createdAt": "2026-09-28T09:19:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-28",
       "id": 96,
       "isDeleted": false,
@@ -1209,6 +1299,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 1790,
       "createdAt": "2026-09-27T09:18:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-27",
       "id": 95,
       "isDeleted": false,
@@ -1225,6 +1317,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 1990,
       "createdAt": "2026-09-21T09:16:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-21",
       "id": 94,
       "isDeleted": false,
@@ -1241,6 +1335,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 2160,
       "createdAt": "2026-09-18T09:15:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-18",
       "id": 93,
       "isDeleted": false,
@@ -1257,6 +1353,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 1500,
       "createdAt": "2026-09-15T09:14:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-15",
       "id": 92,
       "isDeleted": false,
@@ -1273,6 +1371,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 2770,
       "createdAt": "2026-09-12T09:13:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-12",
       "id": 91,
       "isDeleted": false,
@@ -1289,6 +1389,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 20680,
       "createdAt": "2026-09-09T09:12:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-09",
       "id": 90,
       "isDeleted": false,
@@ -1305,6 +1407,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 290,
       "createdAt": "2026-09-06T09:11:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-06",
       "id": 89,
       "isDeleted": false,
@@ -1321,6 +1425,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 76500,
       "createdAt": "2026-09-05T08:00:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-05",
       "id": 98,
       "isDeleted": false,
@@ -1337,6 +1443,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 92000,
       "createdAt": "2026-09-05T08:00:00.000Z",
+      "createdBy": 1,
+      "createdByName": "先生",
       "date": "2026-09-05",
       "id": 97,
       "isDeleted": false,
@@ -1353,6 +1461,8 @@ exports[`GET /transactions > 9 月第 1 頁 1`] = `
     {
       "amount": 1300,
       "createdAt": "2026-09-03T09:10:00.000Z",
+      "createdBy": 2,
+      "createdByName": "太太",
       "date": "2026-09-03",
       "id": 88,
       "isDeleted": false,

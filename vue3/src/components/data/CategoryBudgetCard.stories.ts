@@ -18,9 +18,11 @@ const tx = (id: number, sub: string, payer: string, amount: number, date: string
   createdAt: date + "T09:00:00Z",
   isDeleted: false,
   sourceSubscriptionId: null,
+  createdBy: 1,
   mainCategoryName: "食",
   subCategoryName: sub,
   payerName: payer,
+  createdByName: payer,
 });
 
 const ok: CategoryProgress = {

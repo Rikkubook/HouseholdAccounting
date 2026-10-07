@@ -64,7 +64,10 @@ export const transactions = pgTable("transactions", {
   amount: integer("amount").notNull(),
   /** 可為未來日期（預定支出） */
   date: date("date").notNull(),
-  /** 記帳者＝新增當下登入者；不可代記、不可事後修改 */
+  /**
+   * 記帳者：一般成員只能是自己；管理者可代記他人、可事後更換（sql/0003）。
+   * 訂閱產生的交易與個人帳交易不可更換。
+   */
   payerId: integer("payer_id").notNull(),
   note: text("note"),
   /**
@@ -79,6 +82,8 @@ export const transactions = pgTable("transactions", {
   sourceSubscriptionId: integer("source_subscription_id"),
   /** 個人帳：null = 家庭帳，有值 = 該成員的個人帳，必等於 payerId（sql/0002） */
   ownerId: integer("owner_id"),
+  /** 實際輸入者（可能不是記帳者）；null = 系統自動產生（sql/0003） */
+  createdBy: integer("created_by"),
 });
 
 export const transactionRevisions = pgTable("transaction_revisions", {
