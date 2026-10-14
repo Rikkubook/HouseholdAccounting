@@ -111,10 +111,6 @@ export const subscriptions = pgTable("subscriptions", {
   nextChargeDate: date("next_charge_date").notNull(),
   /** 原本的扣款日（1–31）：遇月底不足只在該月夾齊，下一個足月份回到原日 */
   chargeDay: integer("charge_day").notNull(),
-  /** 年繳：實際年繳扣款的月份（1–12），用來推算第幾期分攤；月繳為 null（sql/0004） */
-  chargeMonth: integer("charge_month"),
-  /** 年繳：本期年費，第 1 期產生時固定，期中改價格不影響本期分攤；月繳為 null */
-  periodAmount: integer("period_amount"),
   mainCategoryId: integer("main_category_id").notNull(),
   /** 扣款人：標記已扣款時以此人為新增交易的記帳者 */
   payerId: integer("payer_id").notNull(),

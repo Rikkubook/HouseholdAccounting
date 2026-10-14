@@ -1,5 +1,5 @@
 import { http } from "./client";
-import type { BillingCycle, Subscription, SubscriptionRevision } from "@/types/models";
+import type { BillingCycle, Subscription, SubscriptionRevision, TransactionView } from "@/types/models";
 
 export interface SubscriptionDraft {
   name: string;
@@ -24,6 +24,14 @@ export const subscriptionsApi = {
   setActive: (id: number, isActive: boolean) =>
     http.post<Subscription>("/subscriptions/" + id + "/active", { isActive }).then((r) => r.data),
 
+  /**
+   * 標記已扣款：後端以本期扣款日產生一筆交易（金額取訂閱設定、記帳者取扣款人），
+   * 再推算下次扣款日。實際金額不同時由扣款人或管理者到交易列表修改該筆。
+   */
+  markPaid: (id: number) =>
+    http
+      .post<{ subscription: Subscription; transaction: TransactionView }>("/subscriptions/" + id + "/mark-paid")
+      .then((r) => r.data),
 
   revisions: (id: number) =>
     http.get<SubscriptionRevision[]>("/subscriptions/" + id + "/revisions").then((r) => r.data),

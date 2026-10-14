@@ -133,10 +133,6 @@ export const subscriptionSchema = z.object({
   nextChargeDate: z.string(),
   /** 原本的扣款日（1–31）；遇月底不足時下次推算的錨點 */
   chargeDay: z.number().int().min(1).max(31),
-  /** 年繳：實際年繳扣款的月份（1–12）；月繳為 null。年繳的 nextChargeDate 是下一期分攤日 */
-  chargeMonth: z.number().int().min(1).max(12).nullable(),
-  /** 年繳：本期年費（第 1 期產生時固定）；月繳或尚未開始分攤為 null */
-  periodAmount: z.number().int().nullable(),
   mainCategoryId: z.number().int(),
   payerId: z.number().int(),
   isActive: z.boolean(),

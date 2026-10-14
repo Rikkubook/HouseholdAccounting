@@ -50,10 +50,6 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
       </span>
     </span>
     <span class="ml-auto text-body text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
-    <template v-if="canEdit && !readonly">
-      <IconButton icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
-      <!-- 刪除前由頁面跳確認視窗，誤觸不會直接刪掉 -->
-      <IconButton icon="delete" label="刪除這筆" variant="danger" :size="40" @click="$emit('remove', tx)" />
-    </template>
+    <IconButton v-if="canEdit && !readonly" icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
   </div>
 </template>

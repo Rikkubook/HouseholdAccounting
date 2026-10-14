@@ -34,21 +34,12 @@ export function monthLabel(month: string): string {
   return y + " 年 " + Number(m) + " 月";
 }
 
-/** en-CA 的日期格式剛好是 YYYY-MM-DD；一律以台灣時間判斷，對齊後端 api/src/lib/dates.ts 的 today。 */
-const dateInTaipei = new Intl.DateTimeFormat("en-CA", {
-  timeZone: "Asia/Taipei",
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
-/** 今天（YYYY-MM-DD，台灣時間）。原本用 toISOString 是 UTC，台灣凌晨 0～8 點會變成前一天。 */
 export function todayISO(): string {
-  return dateInTaipei.format(new Date());
+  return new Date().toISOString().slice(0, 10);
 }
 
 export function currentMonth(): string {
-  return todayISO().slice(0, 7);
+  return new Date().toISOString().slice(0, 7);
 }
 
 export function addMonths(month: string, delta: number): string {
@@ -72,57 +63,9 @@ export function monthlyEquivalent(amount: number, cycle: "monthly" | "yearly"): 
   return cycle === "yearly" ? Math.round(amount / 12) : amount;
 }
 
-/** 依週期推算下次扣款日（對齊後端 advanceChargeDate）：月底不足夾到最後一天，下一個大月回到原日。 */
-export function advanceChargeDate(date: string, cycle: "monthly" | "yearly", anchorDay?: number): string {
-  const y = Number(date.slice(0, 4));
-  const m = Number(date.slice(5, 7));
-  const day = anchorDay ?? Number(date.slice(8, 10));
-  const targetY = cycle === "yearly" ? y + 1 : m === 12 ? y + 1 : y;
-  const targetM = cycle === "yearly" ? m : m === 12 ? 1 : m + 1;
-  const lastDay = new Date(Date.UTC(targetY, targetM, 0)).getUTCDate();
-  return targetY + "-" + String(targetM).padStart(2, "0") + "-" + String(Math.min(day, lastDay)).padStart(2, "0");
-}
-
-/**
- * 年繳分攤（docs/requirements G-6，對齊後端 api/src/lib/dates.ts，兩邊要一起改）：
- * 年費拆 12 期，自扣款月起每月一期；index 0 = 第 1 期（實際年繳扣款那個月）。
- */
-export const INSTALLMENTS = 12;
-
-export function installmentIndex(chargeDate: string, chargeMonth: number): number {
-  return (Number(chargeDate.slice(5, 7)) - chargeMonth + 12) % 12;
-}
-
-/** 每期 = 年費 ÷ 12 取整數，餘數放在最後一期。 */
-export function installmentAmount(periodAmount: number, index: number): number {
-  const base = Math.floor(periodAmount / INSTALLMENTS);
-  return index === INSTALLMENTS - 1 ? periodAmount - base * (INSTALLMENTS - 1) : base;
-}
-
-/** 下一次實際年繳扣款日：還沒開始本期分攤時就是 nextChargeDate，否則是本期結束後的扣款月。 */
-export function nextAnnualChargeDate(nextChargeDate: string, chargeMonth: number, chargeDay: number): string {
-  if (installmentIndex(nextChargeDate, chargeMonth) === 0) return nextChargeDate;
-  const y = Number(nextChargeDate.slice(0, 4));
-  const m = Number(nextChargeDate.slice(5, 7));
-  const targetY = m > chargeMonth ? y + 1 : y;
-  const lastDay = new Date(Date.UTC(targetY, chargeMonth, 0)).getUTCDate();
-  return targetY + "-" + String(chargeMonth).padStart(2, "0") + "-" + String(Math.min(chargeDay, lastDay)).padStart(2, "0");
-}
-
-/** 訂閱頁顯示的「下次扣款日」：年繳顯示實際年繳日，月繳就是 nextChargeDate。 */
-export function displayChargeDate(sub: {
-  cycle: "monthly" | "yearly";
-  nextChargeDate: string;
-  chargeMonth: number | null;
-  chargeDay: number;
-}): string {
-  return sub.cycle === "yearly" && sub.chargeMonth != null
-    ? nextAnnualChargeDate(sub.nextChargeDate, sub.chargeMonth, sub.chargeDay)
-    : sub.nextChargeDate;
-}
-
-/** 年繳本期已分攤幾期（1–11）；尚未開始或不是年繳為 null。 */
-export function installmentsPaid(sub: { cycle: "monthly" | "yearly"; nextChargeDate: string; chargeMonth: number | null }): number | null {
-  if (sub.cycle !== "yearly" || sub.chargeMonth == null) return null;
-  return installmentIndex(sub.nextChargeDate, sub.chargeMonth) || null;
+export function advanceCharge(date: string, cycle: "monthly" | "yearly"): string {
+  const d = new Date(date + "T00:00:00");
+  if (cycle === "yearly") d.setFullYear(d.getFullYear() + 1);
+  else d.setMonth(d.getMonth() + 1);
+  return d.toISOString().slice(0, 10);
 }

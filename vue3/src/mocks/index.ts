@@ -8,12 +8,7 @@ import type {
   TransactionView,
   YearExtraExpense,
 } from "@/types/models";
-import {
-  INSTALLMENTS,
-  installmentIndex,
-  monthlyEquivalent,
-  nextAnnualChargeDate,
-} from "@/utils/format";
+import { advanceCharge, monthlyEquivalent } from "@/utils/format";
 
 /**
  * 開發用假後端：直接替換 axios adapter，路由與回傳形狀與真後端一致，
@@ -246,33 +241,12 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   [/^\/subscriptions$/, "post", (_m, body) => {
     // 訂閱一律歸屬系統分類「訂閱」，與後端一致
     const subscriptionCat = db.categories.find((c) => c.systemKey === "subscription")!;
-    const s: Subscription = {
-      id: ++seq,
-      isActive: true,
-      ...body,
-      mainCategoryId: subscriptionCat.id,
-      chargeDay: Number(body.nextChargeDate.slice(8, 10)),
-      chargeMonth: body.cycle === "yearly" ? Number(body.nextChargeDate.slice(5, 7)) : null,
-      periodAmount: null,
-    };
+    const s: Subscription = { id: ++seq, isActive: true, ...body, mainCategoryId: subscriptionCat.id };
     db.subscriptions.push(s);
     return s;
   }],
   [/^\/subscriptions\/(\d+)$/, "patch", (m, body) => {
     const s = db.subscriptions.find((x) => x.id === Number(m[1]))!;
-    // 年繳分攤進行中：週期與扣款日要等本期結束才能改（與後端一致）
-    const midPeriod = s.cycle === "yearly" && s.chargeMonth != null && installmentIndex(s.nextChargeDate, s.chargeMonth) !== 0;
-    const scheduleChanged =
-      (body.cycle && body.cycle !== s.cycle) || (body.nextChargeDate && body.nextChargeDate !== s.nextChargeDate);
-    if (midPeriod && scheduleChanged) {
-      throw {
-        code: "bad_request",
-        message:
-          "年繳分攤中（已分攤 " + installmentIndex(s.nextChargeDate, s.chargeMonth!) + "/" + INSTALLMENTS +
-          " 期），週期與扣款日要等本期結束後才能改（下次年繳 " +
-          nextAnnualChargeDate(s.nextChargeDate, s.chargeMonth!, s.chargeDay) + "）",
-      };
-    }
     if ((body.amount && body.amount !== s.amount) || (body.cycle && body.cycle !== s.cycle)) {
       // 金額／週期變更寫入歷史版本，舊期間仍以當時金額計算
       db.revisions.push({
@@ -282,19 +256,23 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
       });
     }
     Object.assign(s, body);
-    if (body.nextChargeDate) s.chargeDay = Number(body.nextChargeDate.slice(8, 10));
-    if (s.cycle === "yearly") {
-      if (!midPeriod) s.chargeMonth = Number(s.nextChargeDate.slice(5, 7));
-    } else {
-      s.chargeMonth = null;
-      s.periodAmount = null;
-    }
-    return { ...s };
+    return s;
   }],
   [/^\/subscriptions\/(\d+)\/active$/, "post", (m, body) => {
     const s = db.subscriptions.find((x) => x.id === Number(m[1]))!;
     s.isActive = body.isActive; // 只能停用，不提供刪除
-    return { ...s };
+    return s;
+  }],
+  [/^\/subscriptions\/(\d+)\/mark-paid$/, "post", (m) => {
+    const s = db.subscriptions.find((x) => x.id === Number(m[1]))!;
+    const tx: Transaction = {
+      id: ++seq, type: "expense", mainCategoryId: s.mainCategoryId, subCategoryId: null,
+      amount: s.amount, date: s.nextChargeDate, payerId: s.payerId, createdBy: currentUserId,
+      note: s.name, createdAt: new Date().toISOString(), isDeleted: false, sourceSubscriptionId: s.id,
+    };
+    db.transactions.push(tx);
+    s.nextChargeDate = advanceCharge(s.nextChargeDate, s.cycle);
+    return { subscription: s, transaction: view(tx) };
   }],
   [/^\/subscriptions\/(\d+)\/revisions$/, "get", () => []],
 

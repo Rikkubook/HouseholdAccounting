@@ -19,10 +19,10 @@ import {
   transactions,
 } from "../db/schema.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { INSTALLMENTS, currentMonth, installmentIndex, monthOf, nextAnnualChargeDate } from "../lib/dates.js";
+import { currentMonth, monthOf } from "../lib/dates.js";
 import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
 import { findView } from "../services/views.js";
-import { canCharge, chargeOnce } from "../services/charges.js";
+import { chargeOnce } from "../services/charges.js";
 import { categoryScope, subscriptionScope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
@@ -50,13 +50,7 @@ subscriptionRoutes.post("/", requireAdmin, zValidator("json", subscriptionDraftS
     // chargeDay 取首次扣款日的日數，作為之後推算的錨點
     const [created] = await tx
       .insert(subscriptions)
-      .values({
-        ...draft,
-        mainCategoryId,
-        chargeDay: Number(draft.nextChargeDate.slice(8, 10)),
-        // 年繳：首次扣款日的月份就是之後每年的扣款月（第 1 期）
-        chargeMonth: draft.cycle === "yearly" ? Number(draft.nextChargeDate.slice(5, 7)) : null,
-      })
+      .values({ ...draft, mainCategoryId, chargeDay: Number(draft.nextChargeDate.slice(8, 10)) })
       .returning();
     // 建立時即寫入第一個版本，供固定支出逐月回推
     await tx.insert(subscriptionRevisions).values({
@@ -84,35 +78,14 @@ subscriptionRoutes.patch("/:id", requireAdmin, idParam, zValidator("json", subsc
   const nextCycle = patch.cycle ?? current.cycle;
   const priceChanged = nextAmount !== current.amount || nextCycle !== current.cycle;
 
-  // 年繳分攤進行中（第 2～12 期）：本期已付，週期與扣款日要等本期分攤結束才能改
-  const midPeriod =
-    current.cycle === "yearly" &&
-    current.chargeMonth != null &&
-    installmentIndex(current.nextChargeDate, current.chargeMonth) !== 0;
-  const scheduleChanged =
-    nextCycle !== current.cycle || (patch.nextChargeDate != null && patch.nextChargeDate !== current.nextChargeDate);
-  if (midPeriod && scheduleChanged) {
-    const paid = installmentIndex(current.nextChargeDate, current.chargeMonth!);
-    throw badRequest(
-      "年繳分攤中（已分攤 " + paid + "/" + INSTALLMENTS + " 期），週期與扣款日要等本期結束後才能改（下次年繳 " +
-        nextAnnualChargeDate(current.nextChargeDate, current.chargeMonth!, current.chargeDay) + "）"
-    );
-  }
-  const nextChargeDate = patch.nextChargeDate ?? current.nextChargeDate;
-
   const row = await db.transaction(async (tx) => {
     // 手动改扣款日時錨點跟著重設
     const nextDay = patch.nextChargeDate
       ? { chargeDay: Number(patch.nextChargeDate.slice(8, 10)) }
       : {};
-    // 年繳的扣款月跟著扣款日；改成月繳時清掉年繳欄位（期中改週期已在上面擋下）
-    const yearly =
-      nextCycle === "yearly"
-        ? { chargeMonth: midPeriod ? current.chargeMonth : Number(nextChargeDate.slice(5, 7)) }
-        : { chargeMonth: null, periodAmount: null };
     const [updated] = await tx
       .update(subscriptions)
-      .set({ ...patch, ...nextDay, ...yearly })
+      .set({ ...patch, ...nextDay })
       .where(eq(subscriptions.id, id))
       .returning();
     if (priceChanged) {
@@ -144,7 +117,6 @@ subscriptionRoutes.post("/:id/active", requireAdmin, idParam, zValidator("json",
 
 /**
  * 標記已扣款：以本期扣款日產生一筆交易（金額取訂閱設定、記帳者取扣款人），再推算下次扣款日。
- * 年繳產生的是當月那一期分攤（G6-08）；停用後已付期間的分攤仍可標記。
  * 實際金額不同時由扣款人或管理者到交易列表修改該筆。
  */
 subscriptionRoutes.post("/:id/mark-paid", requireAdmin, idParam, async (c) => {
@@ -152,7 +124,7 @@ subscriptionRoutes.post("/:id/mark-paid", requireAdmin, idParam, async (c) => {
 
   const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
   if (!sub) throw notFound("訂閱不存在");
-  if (!canCharge(sub)) throw badRequest("已停用的訂閱不能標記扣款");
+  if (!sub.isActive) throw badRequest("已停用的訂閱不能標記扣款");
 
   const result = await chargeOnce(id, c.get("user").id);
   if (!result) throw badRequest("本期已扣款，無需重複標記");
