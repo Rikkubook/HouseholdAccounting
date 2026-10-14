@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { money, shortDate } from "@/utils/format";
+import { INSTALLMENTS, displayChargeDate, installmentsPaid, money, shortDate } from "@/utils/format";
 import IconButton from "@/components/base/IconButton.vue";
 import ToggleSwitch from "@/components/base/ToggleSwitch.vue";
 import type { Subscription } from "@/types/models";
@@ -11,14 +11,24 @@ defineProps<{
   /** 到期或逾期提示 */
   dueLabel: string;
 }>();
-defineEmits<{ edit: [Subscription]; markPaid: [Subscription]; toggle: [Subscription, boolean] }>();
+defineEmits<{ edit: [Subscription]; toggle: [Subscription, boolean] }>();
+
+/** 年繳日可能跨年，顯示完整年月日；月繳只顯示月/日。 */
+const chargeDateLabel = (sub: Subscription) =>
+  sub.cycle === "yearly" ? displayChargeDate(sub).replaceAll("-", "/") : shortDate(sub.nextChargeDate);
+
+/** 年繳分攤進度，例如「分攤 3/12」；月繳或本期尚未開始為空字串。 */
+const progress = (sub: Subscription) => {
+  const paid = installmentsPaid(sub);
+  return paid ? "分攤 " + paid + "/" + INSTALLMENTS : "";
+};
 </script>
 
 <template>
   <div
     class="hidden md:grid items-center gap-3 px-5 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px]"
     :class="!sub.isActive && 'opacity-55'"
-    :style="{ gridTemplateColumns: '34px minmax(88px,1fr) 84px 64px 60px 104px 92px 76px' }"
+    :style="{ gridTemplateColumns: '34px minmax(88px,1fr) 84px 64px 60px 104px 92px 44px' }"
   >
     <span class="w-[26px] h-[26px] rounded-sm bg-surface-muted border flex items-center justify-center text-fg-3">
       <span class="material-symbols-rounded text-[15px]">autorenew</span>
@@ -31,12 +41,11 @@ defineEmits<{ edit: [Subscription]; markPaid: [Subscription]; toggle: [Subscript
     <span class="text-fg-2">{{ sub.cycle === "yearly" ? "每年" : "每月" }}</span>
     <span class="text-fg-2">{{ payerName }}</span>
     <span class="flex flex-col gap-0.5">
-      <span class="font-mono text-[12px] text-fg-1">{{ shortDate(sub.nextChargeDate) }}</span>
-      <span class="text-[10.5px] text-fg-4">{{ dueLabel }}</span>
+      <span class="font-mono text-[12px] text-fg-1">{{ chargeDateLabel(sub) }}</span>
+      <span class="text-[10.5px] text-fg-4">{{ [progress(sub), dueLabel].filter(Boolean).join(" · ") }}</span>
     </span>
     <span><ToggleSwitch :model-value="sub.isActive" @update:model-value="$emit('toggle', sub, $event)" /></span>
     <span class="flex justify-end gap-0.5">
-      <IconButton icon="event_available" label="標記已扣款" :size="30" @click="$emit('markPaid', sub)" />
       <IconButton icon="edit" label="編輯" :size="30" @click="$emit('edit', sub)" />
     </span>
   </div>
@@ -55,10 +64,9 @@ defineEmits<{ edit: [Subscription]; markPaid: [Subscription]; toggle: [Subscript
       <span class="ml-auto text-[14px] font-bold text-fg-1 tnum">{{ money(sub.amount) }}</span>
     </div>
     <div class="mt-3 flex items-center gap-2">
-      <span class="font-mono text-[12px] text-fg-2">{{ shortDate(sub.nextChargeDate) }}</span>
-      <span class="text-[10.5px] text-fg-4">{{ dueLabel }}</span>
+      <span class="font-mono text-[12px] text-fg-2">{{ chargeDateLabel(sub) }}</span>
+      <span class="text-[10.5px] text-fg-4">{{ [progress(sub), dueLabel].filter(Boolean).join(" · ") }}</span>
       <span class="ml-auto flex items-center gap-1">
-        <IconButton icon="event_available" label="標記已扣款" :size="40" @click="$emit('markPaid', sub)" />
         <IconButton icon="edit" label="編輯" :size="40" @click="$emit('edit', sub)" />
       </span>
     </div>
