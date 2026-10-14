@@ -613,7 +613,10 @@ export const openApiDocument = {
       patch: {
         tags: ["subscriptions"],
         summary: "修改訂閱",
-        description: ADMIN + " 金額或週期變更會寫入歷史版本（自當月生效），**舊期間仍以當時金額計算**。",
+        description:
+          ADMIN +
+          " 金額或週期變更會寫入歷史版本（自當月生效），**舊期間仍以當時金額計算**。" +
+          "年繳分攤進行中（第 2～12 期）不能改週期與扣款日（400）；改金額從下一期起生效。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("SubscriptionPatch")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors, 404: err("訂閱不存在") },
@@ -635,7 +638,9 @@ export const openApiDocument = {
         summary: "標記已扣款",
         description:
           ADMIN +
-          " 產生一筆交易（記帳者＝訂閱的扣款人）並推進下次扣款日。與每日 Cron 共用同一條路徑，冪等：同一期重複觸發不會扣兩次。實際金額不同時，到交易列表改那一筆。",
+          " 產生一筆交易（記帳者＝訂閱的扣款人）並推進下次扣款日。與每日 Cron 共用同一條路徑，冪等：同一期重複觸發不會扣兩次。實際金額不同時，到交易列表改那一筆。" +
+          "\n\n**年繳**拆成 12 期分攤：每月產生一期（年費 ÷ 12 取整數，餘數放最後一期，備註「名稱（年繳 n/12）」），" +
+          "`nextChargeDate` 每月推進；停用後已付期間的分攤仍可產生，不會開始新的一期。",
         parameters: [pathId()],
         responses: { 200: okJson(ref("MarkPaidResponse")), ...commonErrors },
       },

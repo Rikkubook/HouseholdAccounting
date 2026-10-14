@@ -114,7 +114,11 @@ for (const list of subsByMain.values()) list.sort((a, b) => a.sortOrder - b.sort
 console.log("寫入預算、訂閱與年度額外支出…");
 await db.insert(budgets).values(budgetSeed);
 await db.insert(subscriptions).values(
-  subscriptionSeed.map((s) => ({ ...s, chargeDay: Number(s.nextChargeDate.slice(8, 10)) }))
+  subscriptionSeed.map((s) => ({
+    ...s,
+    chargeDay: Number(s.nextChargeDate.slice(8, 10)),
+    chargeMonth: s.cycle === "yearly" ? Number(s.nextChargeDate.slice(5, 7)) : null,
+  }))
 );
 await db.insert(subscriptionRevisions).values(
   subscriptionSeed.map((s) => ({
