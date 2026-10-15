@@ -307,6 +307,14 @@ const monthQuery = {
   example: "2026-08",
 };
 
+/** 家庭帳／個人帳。個人帳永遠是登入者自己的，所有成員都有，看不到別人的。 */
+const scopeQuery = {
+  name: "scope",
+  in: "query",
+  schema: { type: "string", enum: ["family", "personal"], default: "family" },
+  description: "`family`＝家庭帳（預設，舊版前端不帶也不受影響）；`personal`＝登入者自己的個人帳",
+};
+
 const ADMIN = "**需管理者權限。**";
 const commonErrors = {
   400: err("輸入格式或業務規則不符"),
@@ -320,7 +328,7 @@ export const openApiDocument = {
     title: "家庭帳 API",
     version: "1.0.0",
     description: [
-      "一個家庭共用的記帳 API。兩位成員共記一本帳，管理者可設分類、預算、訂閱與成員。",
+      "一個家庭共用的記帳 API。全家共記一本**家庭帳**，每位成員另有只有自己看得到的**個人帳**；管理者可設分類、預算、訂閱與成員。",
       "",
       "### 通則",
       "- 金額一律新台幣**整數元**，無小數。",
@@ -331,6 +339,7 @@ export const openApiDocument = {
       "### 貫穿全站的規則",
       "- **歷史不可改寫**：交易軟刪除且無復原入口；分類與成員只能停用；交易每次編輯寫入 revision。",
       "- **記帳者**預設為登入者；管理者可代記他人（新增時傳 `payerId`）、事後也可更換，對象須為啟用中的成員。訂閱產生的交易與個人帳交易不可更換。實際輸入者記在 `createdBy`。",
+      "- **個人帳**：查詢與新增帶 `scope=personal`。所有成員（含一般成員）都有，只看得到自己的；別人的個人帳交易一律回 404，管理者也一樣。個人帳不可代記、建立後不能搬到家庭帳。分類、預算、訂閱目前只有家庭帳。",
       "- **預算**僅浮動支出可設；固定支出由訂閱月換算（年繳 ÷12）自動推算。",
       "- **認證**：`POST /auth/login` 取得 JWT，後續請求帶 `Authorization: Bearer <token>`。",
     ].join("\n"),
@@ -416,13 +425,14 @@ export const openApiDocument = {
           { name: "keyword", in: "query", schema: { type: "string", maxLength: 50 } },
           { name: "page", in: "query", schema: { type: "integer", minimum: 1, default: 1 } },
           { name: "pageSize", in: "query", schema: { type: "integer", default: 20 }, description: "前端固定 20" },
+          scopeQuery,
         ],
         responses: { 200: okJson(ref("PagedTransactionView")), 401: commonErrors[401] },
       },
       post: {
         tags: ["transactions"],
         summary: "新增交易",
-        description: "`payerId` 省略＝登入者本人；指定他人**僅限管理者**（代記），且須為啟用中的成員。實際輸入者寫入 `createdBy`。日期可為未來（預定支出）。",
+        description: "`payerId` 省略＝登入者本人；指定他人**僅限管理者**（代記），且須為啟用中的成員。實際輸入者寫入 `createdBy`。日期可為未來（預定支出）。`scope=personal` 記在自己的個人帳，此時不可代記他人（400）。",
         requestBody: { required: true, ...json(ref("TransactionDraft")) },
         responses: { 200: okJson(ref("TransactionView")), 400: commonErrors[400], 401: commonErrors[401] },
       },
@@ -435,14 +445,14 @@ export const openApiDocument = {
           "可改欄位：金額、日期、分類、備註、記帳者；**收支別不可修改**。一般成員只能改自己記的，管理者不受限。記帳者僅管理者可換，且訂閱產生的交易與個人帳交易不可換。每個異動欄位寫一列 revision。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("TransactionPatch")) },
-        responses: { 200: okJson(ref("TransactionView")), ...commonErrors, 404: err("交易不存在") },
+        responses: { 200: okJson(ref("TransactionView")), ...commonErrors, 404: err("交易不存在，或是別人的個人帳") },
       },
       delete: {
         tags: ["transactions"],
         summary: "刪除交易（軟刪除）",
         description: "前台無復原入口，已刪除紀錄不計入任何統計。",
         parameters: [pathId()],
-        responses: { 204: { description: "已刪除" }, ...commonErrors, 404: err("交易不存在") },
+        responses: { 204: { description: "已刪除" }, ...commonErrors, 404: err("交易不存在，或是別人的個人帳") },
       },
     },
     "/transactions/{id}/revisions": {
@@ -450,7 +460,11 @@ export const openApiDocument = {
         tags: ["transactions"],
         summary: "交易修改歷程",
         parameters: [pathId()],
-        responses: { 200: okJson(arrayOf("TransactionRevision")), 401: commonErrors[401] },
+        responses: {
+          200: okJson(arrayOf("TransactionRevision")),
+          401: commonErrors[401],
+          404: err("交易不存在，或是別人的個人帳"),
+        },
       },
     },
 
@@ -709,7 +723,7 @@ export const openApiDocument = {
         tags: ["summary"],
         summary: "首頁儀表板",
         description: "當月收支總覽、固定支出總額、浮動支出分類進度（各附最近交易）。",
-        parameters: [monthQuery],
+        parameters: [monthQuery, scopeQuery],
         responses: { 200: okJson(ref("DashboardPayload")), 401: commonErrors[401] },
       },
     },
@@ -729,6 +743,7 @@ export const openApiDocument = {
             example: "2026-08",
           },
           { name: "payerId", in: "query", schema: { type: "integer" }, description: "不填為全家合計" },
+          scopeQuery,
         ],
         responses: { 200: okJson(ref("StatsPayload")), 400: commonErrors[400], 401: commonErrors[401] },
       },
@@ -738,7 +753,7 @@ export const openApiDocument = {
         tags: ["summary"],
         summary: "年度彙整",
         description: "12 欄矩陣。`null` 表示分類當時不存在、已停用，或該月尚未記錄。",
-        parameters: [{ name: "year", in: "query", required: true, schema: { type: "integer" }, example: 2026 }],
+        parameters: [{ name: "year", in: "query", required: true, schema: { type: "integer" }, example: 2026 }, scopeQuery],
         responses: { 200: okJson(ref("YearSummaryPayload")), 401: commonErrors[401] },
       },
     },
