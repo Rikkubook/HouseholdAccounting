@@ -14,7 +14,7 @@ defineEmits<{ "update:modelValue": [string] }>();
       class="w-hit h-hit rounded-lg border flex items-center justify-center cursor-pointer"
       :class="
         ic === modelValue
-          ? 'bg-brand-tint border-[rgba(107,92,245,.4)] text-brand-600'
+          ? 'bg-brand-tint border-[rgba(var(--brand-rgb),.4)] text-brand-600'
           : 'bg-surface-subtle border text-fg-3'
       "
       @click="$emit('update:modelValue', ic)"

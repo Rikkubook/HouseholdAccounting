@@ -34,6 +34,15 @@ export const useScopeStore = defineStore("scope", () => {
     }
   });
 
+  // 讓 tokens.css 依帳本換品牌色
+  watch(
+    current,
+    (v) => {
+      document.documentElement.dataset.ledger = v;
+    },
+    { immediate: true }
+  );
+
   function set(scope: ScopeName) {
     selected.value = scope;
   }

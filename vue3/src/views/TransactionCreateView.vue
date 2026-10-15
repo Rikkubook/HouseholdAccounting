@@ -124,7 +124,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
               class="flex flex-col items-center gap-1.5 py-3 rounded-lg border cursor-pointer min-h-hit"
               :class="
                 c.id === mainId
-                  ? 'bg-brand-tint border-[rgba(107,92,245,.4)] text-brand-600'
+                  ? 'bg-brand-tint border-[rgba(var(--brand-rgb),.4)] text-brand-600'
                   : 'bg-surface-subtle border text-fg-2'
               "
               @click="pickMain(c.id)"
