@@ -2,7 +2,7 @@
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { NAV_ITEMS } from "@/router/nav";
+import { navItemsFor } from "@/router/nav";
 import { useScopeStore } from "@/stores/scope";
 import ScopeSwitch from "@/components/layout/ScopeSwitch.vue";
 
@@ -51,7 +51,7 @@ function go(to: string) {
           </div>
           <ScopeSwitch class="mx-2.5 mt-3" />
           <div class="flex flex-col gap-0.5 py-3 overflow-auto">
-            <template v-for="item in NAV_ITEMS" :key="item.name">
+            <template v-for="item in navItemsFor(scope.isPersonal)" :key="item.name">
               <div
                 v-if="item.adminDivider"
                 class="mx-5 mt-2 mb-1 font-mono text-[10.5px] tracking-[0.14em] text-fg-4"
