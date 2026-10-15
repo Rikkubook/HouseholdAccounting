@@ -167,7 +167,119 @@ function seedTransactions(): Transaction[] {
   return out;
 }
 
-export const transactions: Transaction[] = seedTransactions();
+/**
+ * 太太（#2）的個人分類與 2026 年 1～9 月個人帳，與 api/src/db/import-personal-2026.ts 相同：
+ * 個人分類只有本人看得到；「投資」是第三種類型，不算支出。
+ */
+const PERSONAL_OWNER = 2;
+type PersonalDef = [name: string, icon: string, type: MainCategory["type"], nature: MainCategory["nature"], subs?: string[]];
+const PERSONAL_CATEGORIES: PersonalDef[] = [
+  ["食", "restaurant", "expense", "floating"],
+  ["衣", "apparel", "expense", "floating"],
+  ["住", "home", "expense", "floating"],
+  ["行", "directions_car", "expense", "floating"],
+  ["健康", "favorite", "expense", "floating"],
+  ["育", "school", "expense", "floating"],
+  ["樂", "sports_esports", "expense", "floating"],
+  ["共同費", "group", "expense", "fixed"],
+  ["交通費", "commute", "expense", "fixed"],
+  ["電話費", "smartphone", "expense", "fixed"],
+  ["孝親費", "volunteer_activism", "expense", "fixed"],
+  ["薪資", "payments", "income", null, ["本薪", "獎金", "被動收入", "其它收入"]],
+  ["投資", "trending_up", "investment", null, ["股票"]],
+];
+PERSONAL_CATEGORIES.forEach(([name, icon, type, nature, subs = []], i) => {
+  const id = 201 + i;
+  categories.push({
+    id, name, icon, type, nature, sortOrder: i + 1, isActive: true, isSystem: false,
+    activeFrom: null, archivedFrom: null,
+    subCategories: subs.map((s, j) => sub(id, s, j + 1)),
+    ownerId: PERSONAL_OWNER,
+  } as MainCategory);
+});
+categories.push({
+  id: 298, name: "訂閱", icon: "autorenew", type: "expense", nature: "fixed", sortOrder: 998,
+  isActive: true, isSystem: true, systemKey: "subscription", activeFrom: null, archivedFrom: null, subCategories: [],
+  ownerId: PERSONAL_OWNER,
+} as MainCategory);
+// 預覽用的個人訂閱範例（10 月起；正式匯入不會建立，由本人在訂閱管理新增）
+subscriptions.push(
+  { id: 201, name: "共同費", amount: 10000, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: 298, payerId: PERSONAL_OWNER, isActive: true },
+  { id: 202, name: "交通費", amount: 1200, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: 298, payerId: PERSONAL_OWNER, isActive: true }
+);
+categories.push({
+  id: 299, name: "其他", icon: "category", type: "expense", nature: "floating", sortOrder: 999,
+  isActive: true, isSystem: true, systemKey: "other", activeFrom: null, archivedFrom: null, subCategories: [],
+  ownerId: PERSONAL_OWNER,
+} as MainCategory);
+
+/** 試算表「額外開銷」欄：個人年度額外開銷，不分攤到單月 */
+const PERSONAL_EXTRAS: [cat: string, amount: number][] = [
+  ["行", 2153],
+  ["健康", 27986],
+  ["育", 8100],
+  ["樂", 6995],
+];
+PERSONAL_EXTRAS.forEach(([cat, amount], i) => {
+  const mainCategoryId = categories.find(
+    (c) => c.name === cat && (c as MainCategory & { ownerId?: number }).ownerId === PERSONAL_OWNER
+  )!.id;
+  yearExtras.push({ id: 201 + i, year: 2026, name: cat + "額外開銷（系統匯入）", amount, mainCategoryId, payerId: PERSONAL_OWNER });
+});
+
+const PERSONAL_LINES: { label: string; cat: string; sub?: string; amounts: number[] }[] = [
+  { label: "薪資1", cat: "薪資", sub: "本薪", amounts: [52733, 20678, 48655, 48655, 48655, 48912, 50608, 48008, 48875] },
+  { label: "薪資2", cat: "薪資", sub: "本薪", amounts: [0, 27069, 0, 0, 800, 0, 0, 0, 0] },
+  { label: "獎金紅利", cat: "薪資", sub: "獎金", amounts: [0, 0, 0, 0, 0, 0, 0, 0, 1000] },
+  { label: "被動收入", cat: "薪資", sub: "被動收入", amounts: [0, 12000, 0, 0, 0, 0, 0, 0, 0] },
+  { label: "其它收入", cat: "薪資", sub: "其它收入", amounts: [0, 7200, 0, 200, 0, 1000, 0, 500, 500] },
+  { label: "食", cat: "食", amounts: [5393, 4650, 4414, 3860, 5930, 4310, 4304, 4415, 6550] },
+  { label: "衣", cat: "衣", amounts: [0, 1000, 0, 0, 320, 2580, 1750, 0, 0] },
+  { label: "住", cat: "住", amounts: [2694, 1200, 1137, 738, 1050, 1255, 615, 0, 0] },
+  { label: "行", cat: "行", amounts: [0, 0, 720, 0, 0, 0, 0, 0, 0] },
+  { label: "健康", cat: "健康", amounts: [0, 0, 720, 0, 1300, 849, 450, 6040, 446] },
+  { label: "育", cat: "育", amounts: [0, 616, 3158, 699, 99, 3750, 1550, 0, 0] },
+  { label: "樂", cat: "樂", amounts: [2890, 1650, 5475, 5403, 1650, 2400, 4126, 2449, 5693] },
+  { label: "共同費", cat: "共同費", amounts: [10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000] },
+  { label: "交通費", cat: "交通費", amounts: [1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200] },
+  { label: "電話費", cat: "電話費", amounts: [1587, 932, 1389, 2368, 4394, 1868, 1139, 2986, 2518] },
+  { label: "孝親費", cat: "孝親費", amounts: [0, 10000, 0, 0, 1500, 0, 0, 0, 1100] },
+  { label: "其他", cat: "其他", amounts: [1386, 1386, 1372, 2409, 1372, 1170, 1170, 1770, 1800] },
+  { label: "股票", cat: "投資", sub: "股票", amounts: [20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000, 20000] },
+];
+
+function seedPersonal(startId: number): Transaction[] {
+  const out: Transaction[] = [];
+  let id = startId;
+  const mine = categories.filter((c) => (c as MainCategory & { ownerId?: number }).ownerId === PERSONAL_OWNER);
+  for (let m = 1; m <= 9; m++) {
+    const date = new Date(Date.UTC(2026, m, 0)).toISOString().slice(0, 10);
+    PERSONAL_LINES.forEach((line) => {
+      const amount = line.amounts[m - 1];
+      if (!amount) return;
+      const cat = mine.find((c) => c.name === line.cat)!;
+      out.push({
+        id: ++id,
+        type: cat.type,
+        mainCategoryId: cat.id,
+        subCategoryId: line.sub ? cat.subCategories.find((s) => s.name === line.sub)!.id : null,
+        amount,
+        date,
+        payerId: PERSONAL_OWNER,
+        createdBy: null,
+        note: line.label + "（系統匯入）",
+        createdAt: date + "T00:00:00Z",
+        isDeleted: false,
+        sourceSubscriptionId: null,
+        ownerId: PERSONAL_OWNER,
+      });
+    });
+  }
+  return out;
+}
+
+const familyTransactions = seedTransactions();
+export const transactions: Transaction[] = [...familyTransactions, ...seedPersonal(familyTransactions.length)];
 
 export const passwords: Record<string, string> = { dad: "1234", mom: "1234", sis: "1234" };
 export const resetCodes: Record<string, string> = { mom: "980901" };

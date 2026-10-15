@@ -25,7 +25,9 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
   >
     <span class="font-mono text-[11.5px] text-fg-4">{{ shortDate(tx.date) }}</span>
     <span class="w-[26px] h-[26px] rounded-sm bg-surface-muted border flex items-center justify-center text-fg-3">
-      <span class="material-symbols-rounded text-[15px]">{{ tx.type === "income" ? "payments" : "receipt_long" }}</span>
+      <span class="material-symbols-rounded text-[15px]">{{
+        tx.type === "income" ? "payments" : tx.type === "investment" ? "trending_up" : "receipt_long"
+      }}</span>
     </span>
     <span class="text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName ?? "—" }}</span>
     <!-- 不顯示記帳者時仍保留這一格，欄位才對得齊 -->

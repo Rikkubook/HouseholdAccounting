@@ -47,7 +47,7 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
       ),
       timed("year.monthsWithData", db.selectDistinct({ month: monthExpr }).from(transactions).where(inYear)),
       timed("year.budgetRows", db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope(scope)))),
-      timed("year.categories", listCategories(true)),
+      timed("year.categories", listCategories(true, scope)),
       timed(
         "year.extras",
         db
@@ -80,6 +80,7 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;
   const expense = totals.find((t) => t.type === "expense")?.amount ?? 0;
+  const investment = totals.find((t) => t.type === "investment")?.amount ?? 0;
 
   /** 每月收支與結餘（不含年度額外開銷，與頂端的全年結餘同口徑）；該月沒有任何交易為 null。 */
   const monthly = months.map((m) => {
@@ -87,7 +88,9 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
     if (inMonth.length === 0) return null;
     const mIncome = inMonth.find((r) => r.type === "income")?.amount ?? 0;
     const mExpense = inMonth.find((r) => r.type === "expense")?.amount ?? 0;
-    return { income: mIncome, expense: mExpense, net: mIncome - mExpense };
+    const mInvestment = inMonth.find((r) => r.type === "investment")?.amount ?? 0;
+    // 結餘＝收入 − 支出（含投資，投資還沒扣）；剩餘現金由前端以 net − investment 算出
+    return { income: mIncome, expense: mExpense, investment: mInvestment, net: mIncome - mExpense };
   });
 
   const cellMap = new Map<string, number>();
@@ -162,6 +165,8 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
     income,
     expense,
     net: income - expense,
+    investment,
+    hasInvestment: categories.some((c) => c.type === "investment") || investment > 0,
     recordedMonths: monthsWithData.length,
     monthly,
     rows,

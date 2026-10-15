@@ -22,6 +22,7 @@ import { useMembersStore } from "@/stores/members";
 import { useTransactionsStore } from "@/stores/transactions";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
+import type { TransactionQuery } from "@/api/transactions";
 import { useScopeStore } from "@/stores/scope";
 import { RouterLink } from "vue-router";
 import { currentMonth, money } from "@/utils/format";
@@ -33,8 +34,14 @@ const members = useMembersStore();
 const store = useTransactionsStore();
 const ui = useUiStore();
 const scope = useScopeStore();
-// 切換帳本：清掉成員篩選（個人帳只有自己）並重新查詢
-watch(() => scope.current, () => store.setFilter({ payerId: null }));
+// 切換帳本：分類換成那本帳的，清掉成員、分類、類型篩選（個人帳只有自己、分類也不同）並重新查詢
+watch(
+  () => scope.current,
+  () => {
+    cats.load();
+    store.setFilter({ payerId: null, mainCategoryId: null, type: "all" });
+  }
+);
 
 const editing = ref<TransactionView | null>(null);
 const editAmount = ref("");
@@ -44,11 +51,13 @@ const editMainId = ref<number | null>(null);
 const editSubId = ref<number | null>(null);
 const editPayerId = ref<number | null>(null);
 
-const typeOptions = [
+/** 帳本有投資分類時才多一個「投資」篩選 */
+const typeOptions = computed(() => [
   { value: "all", label: "全部" },
   { value: "expense", label: "支出" },
   { value: "income", label: "收入" },
-];
+  ...(cats.hasInvestment ? [{ value: "investment", label: "投資" }] : []),
+]);
 
 /** 管理者可編輯全部；一般成員只能編輯自己記的交易。 */
 function canEdit(tx: TransactionView) {
@@ -211,7 +220,7 @@ onMounted(async () => {
         <SegmentedControl
           :options="typeOptions"
           :model-value="store.query.type ?? 'all'"
-          @update:model-value="store.setFilter({ type: $event as 'all' | 'expense' | 'income' })"
+          @update:model-value="store.setFilter({ type: $event as TransactionQuery['type'] })"
         />
         <div class="flex gap-2 md:ml-auto">
           <select

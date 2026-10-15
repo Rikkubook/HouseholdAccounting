@@ -1,7 +1,8 @@
 /** 對映《家庭記帳App_資料庫設計.dbml》。金額一律整數（新台幣元，無小數）。 */
 
 export type Role = "admin" | "member";
-export type TxType = "expense" | "income";
+/** investment = 投資：錢離開錢包但仍是自己的，不算支出也不算收入 */
+export type TxType = "expense" | "income" | "investment";
 export type CategoryNature = "floating" | "fixed";
 export type BillingCycle = "monthly" | "yearly";
 
@@ -32,7 +33,7 @@ export interface MainCategory {
   name: string;
   icon: string;
   type: TxType;
-  /** 收入分類為 null */
+  /** 收入、投資分類為 null */
   nature: CategoryNature | null;
   sortOrder: number;
   isActive: boolean;
@@ -151,6 +152,10 @@ export interface MonthSummary {
   income: number;
   expense: number;
   net: number;
+  /** 投資：不含在 expense 內；剩餘現金＝net − investment */
+  investment: number;
+  /** 該帳本有投資分類時為 true，才顯示投資與剩餘現金 */
+  hasInvestment: boolean;
   fixedTotal: number;
 }
 

@@ -49,7 +49,7 @@ export async function chargeOnce(subscriptionId: number, createdBy: number | nul
   const plan = chargePlan(sub);
 
   const [cat] = await db
-    .select({ name: mainCategories.name })
+    .select({ name: mainCategories.name, ownerId: mainCategories.ownerId })
     .from(mainCategories)
     .where(eq(mainCategories.id, sub.mainCategoryId))
     .limit(1);
@@ -67,6 +67,8 @@ export async function chargeOnce(subscriptionId: number, createdBy: number | nul
         createdBy,
         note: plan.note,
         sourceSubscriptionId: sub.id,
+        // 個人訂閱掛在本人的「訂閱」分類：扣款交易記到他的個人帳（扣款人＝本人，符合 owner＝payer 的約束）
+        ownerId: cat?.ownerId ?? null,
         mainCategoryName: cat?.name ?? null,
         subCategoryName: null,
       })

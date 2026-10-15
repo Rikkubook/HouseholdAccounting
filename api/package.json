@@ -1,6 +1,6 @@
 {
   "name": "@family-ledger/api",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "db:push": "tsx src/db/push.ts",
     "db:seed": "tsx src/db/seed.ts",
     "db:force-import-2026": "tsx src/db/force-import-2026.ts",
+    "db:import-personal-2026": "tsx src/db/import-personal-2026.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

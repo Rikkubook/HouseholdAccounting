@@ -8,13 +8,14 @@ import {
   scopeSchema,
   statsQuerySchema,
   yearExtraDraftSchema,
+  yearExtraPatchSchema,
   yearSchema,
   type YearExtraExpense,
 } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { mainCategories, members, yearExtraExpenses } from "../db/schema.js";
-import { badRequest, notFound } from "../lib/errors.js";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { badRequest, forbidden, notFound } from "../lib/errors.js";
+import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
 import { buildDashboard } from "../services/dashboard.js";
 import { buildStats } from "../services/stats.js";
 import { buildYearSummary } from "../services/year.js";
@@ -43,12 +44,28 @@ summaryRoutes.get("/year", zValidator("query", z.object({ year: yearSchema, ...s
   return c.json(await buildYearSummary(year, resolveScope(c.get("user"), scope)));
 });
 
+/**
+ * 年度額外開銷屬於哪本帳，看它掛的分類（沒有自己的 owner_id，見 services/scope.ts）：
+ * 家庭分類＝家庭帳，限管理者；本人的個人分類＝個人帳，本人就能改（個人帳第 2 批）。
+ * 別人的個人分類一律當作不存在，管理者也一樣。
+ */
+function assertCanWriteExtra(user: AuthUser, cat: { ownerId: number | null } | undefined) {
+  if (!cat || (cat.ownerId != null && cat.ownerId !== user.id)) return "missing" as const;
+  if (cat.ownerId == null && user.role !== "admin") throw forbidden("只有管理者可以修改家庭帳的年度額外開銷");
+  return "ok" as const;
+}
+
 /** 年度額外支出：不分攤到個別月份，僅在年度彙整頁計入。 */
-summaryRoutes.post("/year-extras", requireAdmin, zValidator("json", yearExtraDraftSchema), async (c) => {
+summaryRoutes.post("/year-extras", zValidator("json", yearExtraDraftSchema), async (c) => {
   const draft = c.req.valid("json");
+  const user = c.get("user");
 
   const [cat] = await db.select().from(mainCategories).where(eq(mainCategories.id, draft.mainCategoryId)).limit(1);
-  if (!cat || cat.type !== "expense") throw badRequest("額外支出只能歸屬支出分類");
+  if (assertCanWriteExtra(user, cat) === "missing" || cat!.type !== "expense") {
+    throw badRequest("額外支出只能歸屬支出分類");
+  }
+  // 個人帳的支付者固定是本人（與個人交易相同）
+  if (cat!.ownerId != null && draft.payerId !== user.id) throw badRequest("個人帳的額外開銷支付者只能是自己");
 
   const [payer] = await db.select().from(members).where(eq(members.id, draft.payerId)).limit(1);
   if (!payer) throw badRequest("支付者不存在");
@@ -57,12 +74,53 @@ summaryRoutes.post("/year-extras", requireAdmin, zValidator("json", yearExtraDra
   return c.json<YearExtraExpense>(row!, 201);
 });
 
+/**
+ * 修改年度額外開銷：權限同新增、刪除。分類只能換成同一本帳的支出分類（不能在家庭帳與個人帳之間搬移），
+ * 個人帳的支付者仍固定是本人。
+ */
+summaryRoutes.patch(
+  "/year-extras/:id",
+  zValidator("param", z.object({ id: idSchema })),
+  zValidator("json", yearExtraPatchSchema),
+  async (c) => {
+    const { id } = c.req.valid("param");
+    const patch = c.req.valid("json");
+    const user = c.get("user");
+
+    const [extra] = await db.select().from(yearExtraExpenses).where(eq(yearExtraExpenses.id, id)).limit(1);
+    const [cat] = extra
+      ? await db.select().from(mainCategories).where(eq(mainCategories.id, extra.mainCategoryId)).limit(1)
+      : [];
+    if (!extra || assertCanWriteExtra(user, cat) === "missing") throw notFound("項目不存在");
+
+    if (patch.mainCategoryId !== undefined && patch.mainCategoryId !== extra.mainCategoryId) {
+      const [next] = await db.select().from(mainCategories).where(eq(mainCategories.id, patch.mainCategoryId)).limit(1);
+      if (!next || next.ownerId !== cat!.ownerId || next.type !== "expense") {
+        throw badRequest("只能改成同一本帳的支出分類");
+      }
+    }
+    if (patch.payerId !== undefined && patch.payerId !== extra.payerId) {
+      if (cat!.ownerId != null) throw badRequest("個人帳的額外開銷支付者只能是自己");
+      const [payer] = await db.select().from(members).where(eq(members.id, patch.payerId)).limit(1);
+      if (!payer) throw badRequest("支付者不存在");
+    }
+
+    const [row] = await db.update(yearExtraExpenses).set(patch).where(eq(yearExtraExpenses.id, id)).returning();
+    return c.json<YearExtraExpense>(row!);
+  }
+);
+
 summaryRoutes.delete(
   "/year-extras/:id",
-  requireAdmin,
   zValidator("param", z.object({ id: idSchema })),
   async (c) => {
     const { id } = c.req.valid("param");
+    const [extra] = await db.select().from(yearExtraExpenses).where(eq(yearExtraExpenses.id, id)).limit(1);
+    const [cat] = extra
+      ? await db.select().from(mainCategories).where(eq(mainCategories.id, extra.mainCategoryId)).limit(1)
+      : [];
+    if (!extra || assertCanWriteExtra(c.get("user"), cat) === "missing") throw notFound("項目不存在");
+
     const [row] = await db
       .delete(yearExtraExpenses)
       .where(eq(yearExtraExpenses.id, id))

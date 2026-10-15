@@ -25,6 +25,7 @@ import {
   transactionRevisionSchema,
   transactionViewSchema,
   yearExtraDraftSchema,
+  yearExtraPatchSchema,
   yearExtraExpenseSchema,
 } from "@family-ledger/shared";
 
@@ -71,12 +72,14 @@ const handWritten: Record<string, JsonSchema> = {
   },
   MonthSummary: {
     type: "object",
-    required: ["month", "income", "expense", "net", "fixedTotal", "scheduledExpense"],
+    required: ["month", "income", "expense", "net", "investment", "hasInvestment", "fixedTotal", "scheduledExpense"],
     properties: {
       month: { type: "string", example: "2026-08" },
       income: { type: "integer" },
       expense: { type: "integer" },
-      net: { type: "integer" },
+      net: { type: "integer", description: "收入 − 支出（不扣投資）" },
+      investment: { type: "integer", description: "投資，不含在 expense 內；剩餘現金＝net − investment" },
+      hasInvestment: { type: "boolean", description: "該帳本有投資分類，前端才顯示投資與剩餘現金" },
       fixedTotal: { type: "integer", description: "訂閱月換算總額（年繳 ÷12）" },
       scheduledExpense: { type: "integer", description: "已排定但日期未到，不含在 expense 內" },
     },
@@ -148,23 +151,26 @@ const handWritten: Record<string, JsonSchema> = {
   },
   YearSummaryPayload: {
     type: "object",
-    required: ["year", "income", "expense", "net", "recordedMonths", "monthly", "rows", "extras"],
+    required: ["year", "income", "expense", "net", "investment", "hasInvestment", "recordedMonths", "monthly", "rows", "extras"],
     properties: {
       year: { type: "integer" },
       income: { type: "integer" },
       expense: { type: "integer" },
-      net: { type: "integer" },
+      net: { type: "integer", description: "收入 − 支出（不扣投資）" },
+      investment: { type: "integer", description: "全年投資，不含在 expense 內" },
+      hasInvestment: { type: "boolean", description: "該帳本有投資分類，年度總表才顯示投資合計與剩餘現金" },
       recordedMonths: { type: "integer" },
       monthly: {
         type: "array",
-        description: "12 欄：每月收入、支出、結餘（不含年度額外開銷）；該月沒有交易為 null",
+        description: "12 欄：每月收入、支出、投資、結餘（不含年度額外開銷）；該月沒有交易為 null",
         items: {
           type: "object",
           nullable: true,
-          required: ["income", "expense", "net"],
+          required: ["income", "expense", "investment", "net"],
           properties: {
             income: { type: "integer" },
             expense: { type: "integer" },
+            investment: { type: "integer" },
             net: { type: "integer" },
           },
         },
@@ -279,6 +285,7 @@ const schemas: Record<string, JsonSchema> = {
   SubscriptionPatch: toSchema(subscriptionPatchSchema),
   BudgetUpsert: toSchema(budgetUpsertSchema),
   YearExtraDraft: toSchema(yearExtraDraftSchema),
+  YearExtraPatch: toSchema(yearExtraPatchSchema),
   ApiError: toSchema(apiErrorSchema),
   ...handWritten,
 };
@@ -316,6 +323,10 @@ const scopeQuery = {
 };
 
 const ADMIN = "**需管理者權限。**";
+/** 分類：家庭分類需管理者；個人分類每位成員管自己的（個人帳第 2 批） */
+/** 訂閱：家庭帳需管理者；個人訂閱每位成員管自己的（個人帳第 2 批 PL2-02） */
+const SUB_WRITE = "**家庭帳的訂閱需管理者權限；個人訂閱每位成員可改自己的**，別人的個人訂閱一律回 404（管理者也一樣）。";
+const CAT_WRITE = "**家庭分類需管理者權限；個人分類每位成員可改自己的**，別人的個人分類一律回 404（管理者也一樣）。";
 const commonErrors = {
   400: err("輸入格式或業務規則不符"),
   401: err("未登入或 token 失效"),
@@ -339,7 +350,8 @@ export const openApiDocument = {
       "### 貫穿全站的規則",
       "- **歷史不可改寫**：交易軟刪除且無復原入口；分類與成員只能停用；交易每次編輯寫入 revision。",
       "- **記帳者**預設為登入者；管理者可代記他人（新增時傳 `payerId`）、事後也可更換，對象須為啟用中的成員。訂閱產生的交易與個人帳交易不可更換。實際輸入者記在 `createdBy`。",
-      "- **個人帳**：查詢與新增帶 `scope=personal`。所有成員（含一般成員）都有，只看得到自己的；別人的個人帳交易一律回 404，管理者也一樣。個人帳不可代記、建立後不能搬到家庭帳。分類、預算、訂閱目前只有家庭帳。",
+      "- **個人帳**：查詢與新增帶 `scope=personal`。所有成員（含一般成員）都有，只看得到自己的；別人的個人帳交易一律回 404，管理者也一樣。個人帳不可代記、建立後不能搬到家庭帳。分類、訂閱、年度額外開銷分家庭與個人，個人交易只能用自己的個人分類；預算目前只有家庭帳。",
+      "- **投資**（`type=investment`）：錢離開錢包但仍是自己的，不算支出也不算收入。結餘＝收入 − 支出；剩餘現金＝結餘 − 投資。",
       "- **預算**僅浮動支出可設；固定支出由訂閱月換算（年繳 ÷12）自動推算。",
       "- **認證**：`POST /auth/login` 取得 JWT，後續請求帶 `Authorization: Bearer <token>`。",
     ].join("\n"),
@@ -351,9 +363,9 @@ export const openApiDocument = {
   tags: [
     { name: "auth", description: "登入、登出、重設密碼" },
     { name: "transactions", description: "交易記錄與修改歷程" },
-    { name: "categories", description: "主分類與子分類（ADMIN）" },
+    { name: "categories", description: "主分類與子分類（家庭分類 ADMIN；個人分類本人）" },
     { name: "budgets", description: "逐月預算（ADMIN 寫入）" },
-    { name: "subscriptions", description: "訂閱與扣款（ADMIN）" },
+    { name: "subscriptions", description: "訂閱與扣款（家庭帳 ADMIN；個人訂閱本人）" },
     { name: "members", description: "成員與密碼重設碼（ADMIN 寫入）" },
     { name: "summary", description: "儀表板、統計、年度彙整" },
     { name: "cron", description: "Vercel Cron 專用，驗 CRON_SECRET 而非成員 JWT" },
@@ -419,7 +431,7 @@ export const openApiDocument = {
         description: "一律依建立時間由近到遠。`keyword` 僅搜尋備註。已軟刪除的不會出現。",
         parameters: [
           { name: "month", in: "query", schema: { type: "string" }, example: "2026-08" },
-          { name: "type", in: "query", schema: { type: "string", enum: ["all", "expense", "income"], default: "all" } },
+          { name: "type", in: "query", schema: { type: "string", enum: ["all", "expense", "income", "investment"], default: "all" } },
           { name: "mainCategoryId", in: "query", schema: { type: "integer" } },
           { name: "payerId", in: "query", schema: { type: "integer" } },
           { name: "keyword", in: "query", schema: { type: "string", maxLength: 50 } },
@@ -472,8 +484,9 @@ export const openApiDocument = {
       get: {
         tags: ["categories"],
         summary: "分類清單（含子分類）",
-        description: "記帳與篩選都需要，讀取開放全員。",
+        description: "記帳與篩選都需要，讀取開放全員。`scope=personal` 只回登入者自己的個人分類；第一次讀取時自動建立系統分類「其他」。",
         parameters: [
+          scopeQuery,
           {
             name: "includeArchived",
             in: "query",
@@ -486,65 +499,67 @@ export const openApiDocument = {
       post: {
         tags: ["categories"],
         summary: "新增主分類",
-        description: ADMIN + " 支出分類須指定浮動或固定；收入分類不得有 `nature`。",
+        description: CAT_WRITE + " 支出分類須指定浮動或固定；收入與投資分類不得有 `nature`。`scope=personal` 建立在登入者自己的個人帳。",
+        parameters: [scopeQuery],
         requestBody: { required: true, ...json(ref("MainCategoryDraft")) },
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/{id}": {
       patch: {
         tags: ["categories"],
         summary: "修改主分類",
-        description: ADMIN + " 只能改名稱與圖示；**收支別與性質建立後不可修改**，避免歷史統計錯位。系統保留分類「其他」不可修改。",
+        description: CAT_WRITE + " 只能改名稱與圖示；**收支別與性質建立後不可修改**，避免歷史統計錯位。系統保留分類「其他」不可修改。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("MainCategoryPatch")) },
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在") },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/{id}/archive": {
       post: {
         tags: ["categories"],
         summary: "停用主分類",
-        description: ADMIN + " 只能停用不能刪除；歷史交易保留原分類。停用年月＝當月，之後的月份在年度表顯示「—」。",
+        description: CAT_WRITE + " 只能停用不能刪除；歷史交易保留原分類。停用年月＝當月，之後的月份在年度表顯示「—」。",
         parameters: [pathId()],
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/{id}/restore": {
       post: {
         tags: ["categories"],
         summary: "重新啟用主分類",
-        description: ADMIN,
+        description: CAT_WRITE,
         parameters: [pathId()],
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/reorder": {
       post: {
         tags: ["categories"],
         summary: "主分類排序",
-        description: ADMIN,
+        description: CAT_WRITE + " `orderedIds` 必須都屬於 `scope` 指定的帳本。",
+        parameters: [scopeQuery],
         requestBody: { required: true, ...json(ref("Reorder")) },
-        responses: { 204: { description: "已更新" }, ...commonErrors },
+        responses: { 204: { description: "已更新" }, ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/{id}/subs": {
       post: {
         tags: ["categories"],
         summary: "新增子分類",
-        description: ADMIN + " 歸屬主分類只在新增時決定，**不可搬移**。同一主分類下名稱不可重複。",
+        description: CAT_WRITE + " 歸屬主分類只在新增時決定，**不可搬移**。同一主分類下名稱不可重複。",
         parameters: [pathId("id", "主分類 id")],
         requestBody: { required: true, ...json(ref("SubName")) },
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/subs/{subId}": {
       patch: {
         tags: ["categories"],
         summary: "子分類改名",
-        description: ADMIN,
+        description: CAT_WRITE,
         parameters: [pathId("subId")],
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
         requestBody: { required: true, ...json(ref("SubName")) },
       },
     },
@@ -552,19 +567,19 @@ export const openApiDocument = {
       post: {
         tags: ["categories"],
         summary: "停用子分類",
-        description: ADMIN,
+        description: CAT_WRITE,
         parameters: [pathId("subId")],
-        responses: { 200: okJson(ref("MainCategory")), ...commonErrors },
+        responses: { 200: okJson(ref("MainCategory")), ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
     "/categories/{id}/subs/reorder": {
       post: {
         tags: ["categories"],
         summary: "子分類排序",
-        description: ADMIN,
+        description: CAT_WRITE,
         parameters: [pathId("id", "主分類 id")],
         requestBody: { required: true, ...json(ref("Reorder")) },
-        responses: { 204: { description: "已更新" }, ...commonErrors },
+        responses: { 204: { description: "已更新" }, ...commonErrors, 404: err("分類不存在，或是別人的個人分類") },
       },
     },
 
@@ -612,13 +627,15 @@ export const openApiDocument = {
       get: {
         tags: ["subscriptions"],
         summary: "訂閱清單",
-        description: "依下次扣款日排序。",
+        description: "依下次扣款日排序。`scope=personal` 只回登入者自己的個人訂閱。",
+        parameters: [scopeQuery],
         responses: { 200: okJson(arrayOf("Subscription")), 401: commonErrors[401] },
       },
       post: {
         tags: ["subscriptions"],
         summary: "新增訂閱",
-        description: ADMIN + "\n\n訂閱一律歸屬系統分類「訂閱」，由後端填入，不接受前端傳 `mainCategoryId`。",
+        description: SUB_WRITE + "\n\n訂閱一律歸屬該帳本的系統分類「訂閱」，由後端填入，不接受前端傳 `mainCategoryId`。`scope=personal` 建立在自己的個人帳，`payerId` 必須是自己，自動扣款的交易記到個人帳。",
+        parameters: [scopeQuery],
         requestBody: { required: true, ...json(ref("SubscriptionDraft")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors },
       },
@@ -628,19 +645,19 @@ export const openApiDocument = {
         tags: ["subscriptions"],
         summary: "修改訂閱",
         description:
-          ADMIN +
+          SUB_WRITE +
           " 金額或週期變更會寫入歷史版本（自當月生效），**舊期間仍以當時金額計算**。" +
           "年繳分攤進行中（第 2～12 期）不能改週期與扣款日（400）；改金額從下一期起生效。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("SubscriptionPatch")) },
-        responses: { 200: okJson(ref("Subscription")), ...commonErrors, 404: err("訂閱不存在") },
+        responses: { 200: okJson(ref("Subscription")), ...commonErrors, 404: err("訂閱不存在，或是別人的個人訂閱") },
       },
     },
     "/subscriptions/{id}/active": {
       post: {
         tags: ["subscriptions"],
         summary: "啟用／停用訂閱",
-        description: ADMIN + " 只能停用，不提供刪除。",
+        description: SUB_WRITE + " 只能停用，不提供刪除。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("SetActive")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors },
@@ -651,7 +668,7 @@ export const openApiDocument = {
         tags: ["subscriptions"],
         summary: "標記已扣款",
         description:
-          ADMIN +
+          SUB_WRITE +
           " 產生一筆交易（記帳者＝訂閱的扣款人）並推進下次扣款日。與每日 Cron 共用同一條路徑，冪等：同一期重複觸發不會扣兩次。實際金額不同時，到交易列表改那一筆。" +
           "\n\n**年繳**拆成 12 期分攤：每月產生一期（年費 ÷ 12 取整數，餘數放最後一期，備註「名稱（年繳 n/12）」），" +
           "`nextChargeDate` 每月推進；停用後已付期間的分攤仍可產生，不會開始新的一期。",
@@ -664,7 +681,7 @@ export const openApiDocument = {
         tags: ["subscriptions"],
         summary: "訂閱金額變更歷史",
         parameters: [pathId()],
-        responses: { 200: okJson(arrayOf("SubscriptionRevision")), 401: commonErrors[401] },
+        responses: { 200: okJson(arrayOf("SubscriptionRevision")), 401: commonErrors[401], 404: err("訂閱不存在，或是別人的個人訂閱") },
       },
     },
 
@@ -766,18 +783,28 @@ export const openApiDocument = {
       post: {
         tags: ["summary"],
         summary: "新增年度額外支出",
-        description: ADMIN + " 不分攤到個別月份，僅在年度彙整頁計入。",
+        description:
+          "不分攤到個別月份，僅在年度彙整頁計入。屬於哪本帳看 `mainCategoryId`：家庭分類**需管理者權限**；本人的個人分類任何成員都可以，且 `payerId` 必須是自己。",
         requestBody: { required: true, ...json(ref("YearExtraDraft")) },
         responses: { 200: okJson(ref("YearExtraExpense")), ...commonErrors },
       },
     },
     "/summary/year-extras/{id}": {
+      patch: {
+        tags: ["summary"],
+        summary: "修改年度額外支出",
+        description:
+          "權限同新增：家庭帳的**需管理者權限**，個人帳的本人可改。年度不可改；分類只能換成同一本帳的支出分類；個人帳的支付者固定是本人。",
+        parameters: [pathId()],
+        requestBody: { required: true, ...json(ref("YearExtraPatch")) },
+        responses: { 200: okJson(ref("YearExtraExpense")), ...commonErrors, 404: err("項目不存在，或是別人的個人帳") },
+      },
       delete: {
         tags: ["summary"],
         summary: "刪除年度額外支出",
-        description: ADMIN + " 這是唯一真正硬刪除的資料（非交易紀錄）。",
+        description: "家庭帳的**需管理者權限**；個人帳的本人可刪。這是唯一真正硬刪除的資料（非交易紀錄）。",
         parameters: [pathId()],
-        responses: { 204: { description: "已刪除" }, ...commonErrors },
+        responses: { 204: { description: "已刪除" }, ...commonErrors, 404: err("項目不存在，或是別人的個人帳") },
       },
     },
 

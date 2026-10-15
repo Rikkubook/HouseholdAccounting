@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import {
+  categoryScopeQuerySchema,
   idSchema,
   setActiveSchema,
   subscriptionDraftSchema,
@@ -18,33 +19,61 @@ import {
   subscriptions,
   transactions,
 } from "../db/schema.js";
-import { badRequest, notFound } from "../lib/errors.js";
+import { badRequest, forbidden, notFound } from "../lib/errors.js";
 import { INSTALLMENTS, currentMonth, installmentIndex, monthOf, nextAnnualChargeDate } from "../lib/dates.js";
-import { requireAdmin, requireAuth, type AppEnv } from "../middleware/auth.js";
+import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
 import { findView } from "../services/views.js";
 import { canCharge, chargeOnce } from "../services/charges.js";
-import { categoryScope, subscriptionScope } from "../services/scope.js";
+import { ensurePersonalDefaults } from "../services/categories.js";
+import { categoryScope, resolveScope, subscriptionScope, type Scope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
+const scopeQuery = zValidator("query", categoryScopeQuerySchema);
 
 export const subscriptionRoutes = new Hono<AppEnv>();
 
-// 儀表板固定支出需要訂閱資料，讀取開放全員；寫入 ADMIN
+/**
+ * 訂閱屬於哪本帳，看它掛的系統分類「訂閱」是家庭的還是個人的（沒有自己的 owner_id）。
+ * 家庭帳：讀取開放全員（儀表板要用），寫入限管理者。
+ * 個人帳（個人帳第 2 批 PL2-02）：每位成員管自己的，扣款人固定是本人；別人的一律當作不存在。
+ */
 subscriptionRoutes.use("/*", requireAuth);
 
-subscriptionRoutes.get("/", async (c) => {
+function assertCanWrite(user: AuthUser, scope: Scope): void {
+  if (scope.kind === "family" && user.role !== "admin") throw forbidden("只有管理者可以修改家庭帳的訂閱");
+}
+
+/** 取出要修改的訂閱並檢查權限；回傳它所屬的帳本 */
+async function loadWritable(user: AuthUser, id: number) {
+  const [row] = await db
+    .select({ sub: subscriptions, ownerId: mainCategories.ownerId })
+    .from(subscriptions)
+    .innerJoin(mainCategories, eq(mainCategories.id, subscriptions.mainCategoryId))
+    .where(eq(subscriptions.id, id))
+    .limit(1);
+  if (!row || (row.ownerId != null && row.ownerId !== user.id)) throw notFound("訂閱不存在");
+  const scope: Scope = row.ownerId == null ? { kind: "family" } : { kind: "personal", ownerId: row.ownerId };
+  assertCanWrite(user, scope);
+  return { current: row.sub, scope };
+}
+
+subscriptionRoutes.get("/", scopeQuery, async (c) => {
+  const scope = resolveScope(c.get("user"), c.req.valid("query").scope);
   const rows = await db
     .select()
     .from(subscriptions)
-    .where(subscriptionScope())
+    .where(subscriptionScope(scope))
     .orderBy(asc(subscriptions.nextChargeDate));
   return c.json<Subscription[]>(rows);
 });
 
-subscriptionRoutes.post("/", requireAdmin, zValidator("json", subscriptionDraftSchema), async (c) => {
+subscriptionRoutes.post("/", scopeQuery, zValidator("json", subscriptionDraftSchema), async (c) => {
   const draft = c.req.valid("json");
-  await assertPayer(draft.payerId);
-  const mainCategoryId = await subscriptionCategoryId();
+  const user = c.get("user");
+  const scope = resolveScope(user, c.req.valid("query").scope);
+  assertCanWrite(user, scope);
+  await assertPayer(draft.payerId, scope);
+  const mainCategoryId = await subscriptionCategoryId(scope);
 
   const row = await db.transaction(async (tx) => {
     // chargeDay 取首次扣款日的日數，作為之後推算的錨點
@@ -72,13 +101,12 @@ subscriptionRoutes.post("/", requireAdmin, zValidator("json", subscriptionDraftS
 });
 
 /** 金額或週期變更寫入歷史版本（自當月生效），舊期間仍以當時金額計算。 */
-subscriptionRoutes.patch("/:id", requireAdmin, idParam, zValidator("json", subscriptionPatchSchema), async (c) => {
+subscriptionRoutes.patch("/:id", idParam, zValidator("json", subscriptionPatchSchema), async (c) => {
   const { id } = c.req.valid("param");
   const patch = c.req.valid("json");
 
-  const [current] = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
-  if (!current) throw notFound("訂閱不存在");
-  if (patch.payerId) await assertPayer(patch.payerId);
+  const { current, scope } = await loadWritable(c.get("user"), id);
+  if (patch.payerId) await assertPayer(patch.payerId, scope);
 
   const nextAmount = patch.amount ?? current.amount;
   const nextCycle = patch.cycle ?? current.cycle;
@@ -131,8 +159,9 @@ subscriptionRoutes.patch("/:id", requireAdmin, idParam, zValidator("json", subsc
 });
 
 /** 只能停用，不提供刪除。 */
-subscriptionRoutes.post("/:id/active", requireAdmin, idParam, zValidator("json", setActiveSchema), async (c) => {
+subscriptionRoutes.post("/:id/active", idParam, zValidator("json", setActiveSchema), async (c) => {
   const { id } = c.req.valid("param");
+  await loadWritable(c.get("user"), id);
   const [row] = await db
     .update(subscriptions)
     .set({ isActive: c.req.valid("json").isActive })
@@ -147,11 +176,10 @@ subscriptionRoutes.post("/:id/active", requireAdmin, idParam, zValidator("json",
  * 年繳產生的是當月那一期分攤（G6-08）；停用後已付期間的分攤仍可標記。
  * 實際金額不同時由扣款人或管理者到交易列表修改該筆。
  */
-subscriptionRoutes.post("/:id/mark-paid", requireAdmin, idParam, async (c) => {
+subscriptionRoutes.post("/:id/mark-paid", idParam, async (c) => {
   const { id } = c.req.valid("param");
 
-  const [sub] = await db.select().from(subscriptions).where(eq(subscriptions.id, id)).limit(1);
-  if (!sub) throw notFound("訂閱不存在");
+  const { current: sub } = await loadWritable(c.get("user"), id);
   if (!canCharge(sub)) throw badRequest("已停用的訂閱不能標記扣款");
 
   const result = await chargeOnce(id, c.get("user").id);
@@ -164,6 +192,14 @@ subscriptionRoutes.post("/:id/mark-paid", requireAdmin, idParam, async (c) => {
 
 subscriptionRoutes.get("/:id/revisions", idParam, async (c) => {
   const { id } = c.req.valid("param");
+  // 別人的個人訂閱一律當作不存在
+  const [row] = await db
+    .select({ ownerId: mainCategories.ownerId })
+    .from(subscriptions)
+    .innerJoin(mainCategories, eq(mainCategories.id, subscriptions.mainCategoryId))
+    .where(eq(subscriptions.id, id))
+    .limit(1);
+  if (!row || (row.ownerId != null && row.ownerId !== c.get("user").id)) throw notFound("訂閱不存在");
   const rows = await db
     .select()
     .from(subscriptionRevisions)
@@ -173,20 +209,23 @@ subscriptionRoutes.get("/:id/revisions", idParam, async (c) => {
 });
 
 /**
- * 訂閱一律歸屬系統分類「訂閱」（sql/0001）：它不可停用，
- * 所以不會發生「分類停用了、訂閱還在扣款與攤提」的情況。
+ * 訂閱一律歸屬該帳本的系統分類「訂閱」（家庭：sql/0001；個人：第一次使用時自動建立）：
+ * 它不可停用，所以不會發生「分類停用了、訂閱還在扣款與攤提」的情況。
  */
-async function subscriptionCategoryId(): Promise<number> {
+async function subscriptionCategoryId(scope: Scope): Promise<number> {
+  if (scope.kind === "personal") await ensurePersonalDefaults(scope.ownerId);
   const [cat] = await db
     .select({ id: mainCategories.id })
     .from(mainCategories)
-    .where(and(eq(mainCategories.systemKey, "subscription"), categoryScope()))
+    .where(and(eq(mainCategories.systemKey, "subscription"), categoryScope(scope)))
     .limit(1);
   if (!cat) throw new Error("找不到系統分類「訂閱」，請先執行 db:push");
   return cat.id;
 }
 
-async function assertPayer(payerId: number): Promise<void> {
+/** 個人帳的扣款人固定是本人（個人帳交易的 owner 必須等於記帳者） */
+async function assertPayer(payerId: number, scope: Scope): Promise<void> {
+  if (scope.kind === "personal" && payerId !== scope.ownerId) throw badRequest("個人訂閱的扣款人只能是自己");
   const [payer] = await db.select().from(members).where(eq(members.id, payerId)).limit(1);
   if (!payer || !payer.isActive) throw badRequest("扣款人不存在或已停用");
 }

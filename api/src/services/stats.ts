@@ -42,7 +42,7 @@ export async function buildStats(
       .from(transactions)
       .where(where)
       .groupBy(transactions.mainCategoryId, transactions.subCategoryId),
-    listCategories(true),
+    listCategories(true, scope),
     db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope(scope))),
     ...months.map((m) => effectiveSubscriptions(m, scope)),
   ]);

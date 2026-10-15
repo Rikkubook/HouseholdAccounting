@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { DashboardPayload, TransactionView } from "@family-ledger/shared";
+import type { DashboardPayload, MainCategory, TransactionView } from "@family-ledger/shared";
 import { api, freezeToday, reseed } from "./helpers.js";
 
 /**
@@ -29,17 +29,38 @@ const FAMILY_ENDPOINTS = [
 
 let dadLunch: TransactionView;
 let dadBonus: TransactionView;
+/** 個人帳第 2 批起個人交易只能用本人的個人分類 */
+let dadFood: MainCategory;
+let dadSalary: MainCategory;
+let sisFood: MainCategory;
+
+const createPersonalCategory = async (
+  body: { name: string; type: "expense" | "income"; nature: "floating" | null },
+  as: "dad" | "sis" = "dad"
+) => {
+  const res = await api<MainCategory>("/categories?scope=personal", {
+    method: "POST",
+    as,
+    body: { icon: "category", ...body },
+  });
+  expect(res.status).toBe(201);
+  return res.body;
+};
 
 beforeAll(async () => {
   for (const path of FAMILY_ENDPOINTS) familyBefore[path] = (await api(path)).body;
 
+  dadFood = await createPersonalCategory({ name: "午餐", type: "expense", nature: "floating" });
+  dadSalary = await createPersonalCategory({ name: "薪資", type: "income", nature: null });
+  sisFood = await createPersonalCategory({ name: "點心", type: "expense", nature: "floating" }, "sis");
+
   const lunch = await api<TransactionView>("/transactions", {
     method: "POST",
-    body: { type: "expense", mainCategoryId: 1, subCategoryId: null, amount: 380, date: "2026-09-02", scope: "personal" },
+    body: { type: "expense", mainCategoryId: dadFood.id, subCategoryId: null, amount: 380, date: "2026-09-02", scope: "personal" },
   });
   const bonus = await api<TransactionView>("/transactions", {
     method: "POST",
-    body: { type: "income", mainCategoryId: 10, subCategoryId: null, amount: 5000, date: "2026-09-04", scope: "personal" },
+    body: { type: "income", mainCategoryId: dadSalary.id, subCategoryId: null, amount: 5000, date: "2026-09-04", scope: "personal" },
   });
   expect(lunch.status).toBe(201);
   expect(bonus.status).toBe(201);
@@ -67,7 +88,7 @@ describe("記個人帳", () => {
     const create = await api<TransactionView>("/transactions", {
       method: "POST",
       as: "sis",
-      body: { type: "expense", mainCategoryId: 1, subCategoryId: null, amount: 100, date: "2026-09-02", scope: "personal" },
+      body: { type: "expense", mainCategoryId: sisFood.id, subCategoryId: null, amount: 100, date: "2026-09-02", scope: "personal" },
     });
     expect(create.status).toBe(201);
     expect(create.body).toMatchObject({ ownerId: 3, payerId: 3 });
@@ -84,7 +105,7 @@ describe("記個人帳", () => {
   it("個人帳不能代記他人，個人交易也不能更換記帳者", async () => {
     const create = await api("/transactions", {
       method: "POST",
-      body: { type: "expense", mainCategoryId: 1, subCategoryId: null, amount: 1, date: "2026-09-01", scope: "personal", payerId: 2 },
+      body: { type: "expense", mainCategoryId: dadFood.id, subCategoryId: null, amount: 1, date: "2026-09-01", scope: "personal", payerId: 2 },
     });
     expect(create.status).toBe(400);
 
@@ -92,16 +113,30 @@ describe("記個人帳", () => {
     expect(patch.status).toBe(400);
   });
 
-  it("個人分類要到第 2 批才開放", async () => {
-    const [cat] = await sql<{ id: number }[]>`
-      insert into main_categories (name, icon, type, nature, sort_order, owner_id)
-      values ('個人分類', 'category', 'expense', 'floating', 1, 1) returning id`;
+  it("分類不能跨帳本：個人交易不能用家庭分類，家庭交易也不能用個人分類", async () => {
+    const personalWithFamilyCat = await api("/transactions", {
+      method: "POST",
+      body: { type: "expense", mainCategoryId: 1, subCategoryId: null, amount: 1, date: "2026-09-02", scope: "personal" },
+    });
+    expect(personalWithFamilyCat.status).toBe(400);
+
+    const familyWithPersonalCat = await api("/transactions", {
+      method: "POST",
+      body: { type: "expense", mainCategoryId: dadFood.id, subCategoryId: null, amount: 1, date: "2026-09-02" },
+    });
+    expect(familyWithPersonalCat.status).toBe(400);
+
+    // 修改時也不能把個人交易改成家庭分類
+    const patch = await api(`/transactions/${dadLunch.id}`, { method: "PATCH", body: { mainCategoryId: 1 } });
+    expect(patch.status).toBe(400);
+  });
+
+  it("不能用別人的個人分類", async () => {
     const res = await api("/transactions", {
       method: "POST",
-      body: { type: "expense", mainCategoryId: cat!.id, subCategoryId: null, amount: 1, date: "2026-09-02", scope: "personal" },
+      body: { type: "expense", mainCategoryId: sisFood.id, subCategoryId: null, amount: 1, date: "2026-09-02", scope: "personal" },
     });
     expect(res.status).toBe(400);
-    await sql`delete from main_categories where id = ${cat!.id}`;
   });
 });
 
@@ -126,7 +161,9 @@ describe("家庭帳與個人帳互不影響", () => {
     const { body } = await api<DashboardPayload>("/summary/dashboard?month=2026-09&scope=personal");
     expect(body.summary).toMatchObject({ income: 5000, expense: 380, net: 4620, fixedTotal: 0, scheduledExpense: 0 });
     expect(body.categories.every((c) => c.budget === null)).toBe(true);
-    expect(body.categories.find((c) => c.id === 1)?.spent).toBe(380);
+    expect(body.categories.find((c) => c.id === dadFood.id)?.spent).toBe(380);
+    // 個人首頁的分類卡片只列本人的個人分類，不會出現家庭分類
+    expect(body.categories.some((c) => c.id === 1)).toBe(false);
     expect(body.recent.map((t) => t.id).sort()).toEqual([dadLunch.id, dadBonus.id].sort());
   });
 

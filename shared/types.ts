@@ -30,6 +30,7 @@ export type MemberDraft = z.infer<typeof s.memberDraftSchema>;
 export type MainCategoryDraft = z.infer<typeof s.mainCategoryDraftSchema>;
 export type SubscriptionDraft = z.infer<typeof s.subscriptionDraftSchema>;
 export type YearExtraDraft = z.infer<typeof s.yearExtraDraftSchema>;
+export type YearExtraPatch = z.infer<typeof s.yearExtraPatchSchema>;
 
 export type ApiError = z.infer<typeof s.apiErrorSchema>;
 
@@ -52,6 +53,10 @@ export interface MonthSummary {
   income: number;
   expense: number;
   net: number;
+  /** 投資：不含在 expense 內；剩餘現金＝income − expense − investment */
+  investment: number;
+  /** 該帳本有投資分類時為 true，首頁才顯示投資與剩餘現金 */
+  hasInvestment: boolean;
   fixedTotal: number;
   /** 已排定但日期未到的支出，不含在 expense 內 */
   scheduledExpense: number;
@@ -112,9 +117,13 @@ export interface YearSummaryPayload {
   income: number;
   expense: number;
   net: number;
+  /** 全年投資；不含在 expense 內 */
+  investment: number;
+  /** 該帳本有投資分類時為 true，年度總表才顯示投資合計與剩餘現金兩列 */
+  hasInvestment: boolean;
   recordedMonths: number;
-  /** 12 欄：每月收入、支出、結餘（不含年度額外開銷）；該月沒有交易為 null */
-  monthly: ({ income: number; expense: number; net: number } | null)[];
+  /** 12 欄：每月收入、支出、投資、結餘（不含年度額外開銷）；該月沒有交易為 null */
+  monthly: ({ income: number; expense: number; investment: number; net: number } | null)[];
   rows: YearCategoryRow[];
   extras: (YearExtraExpense & { categoryName: string; payerName: string })[];
 }

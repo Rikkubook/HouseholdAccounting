@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRouter } from "vue-router";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
@@ -42,6 +42,13 @@ const mainOptions = computed(() => cats.selectable.filter((c) => c.type === type
 const currentMain = computed(() => mainOptions.value.find((c) => c.id === mainId.value));
 const subOptions = computed(() => currentMain.value?.subCategories ?? []);
 const isFutureDate = computed(() => date.value > todayISO());
+
+/** 帳本有投資分類時才多一個「投資」選項（不算支出，見個人帳規格 6.3） */
+const typeOptions = computed(() => [
+  { value: "expense", label: "支出" },
+  { value: "income", label: "收入" },
+  ...(cats.hasInvestment ? [{ value: "investment", label: "投資" }] : []),
+]);
 
 function switchType(next: string) {
   type.value = next as TxType;
@@ -88,6 +95,15 @@ async function submit() {
 }
 
 onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefined]));
+
+// 換帳本：分類跟著換成那本帳的，已選的分類清掉
+watch(
+  () => scope.current,
+  async () => {
+    await cats.load();
+    switchType(cats.hasInvestment || type.value !== "investment" ? type.value : "expense");
+  }
+);
 </script>
 
 <template>
@@ -101,14 +117,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
   >
     <AppCard>
       <div class="flex flex-col gap-4">
-        <SegmentedControl
-          :options="[
-            { value: 'expense', label: '支出' },
-            { value: 'income', label: '收入' },
-          ]"
-          :model-value="type"
-          @update:model-value="switchType"
-        />
+        <SegmentedControl :options="typeOptions" :model-value="type" @update:model-value="switchType" />
 
         <FormField label="金額" :error="error.includes('金額') ? error : undefined">
           <AmountInput v-model="amount" :invalid="error.includes('金額')" />

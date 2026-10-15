@@ -47,9 +47,13 @@ export interface YearSummaryPayload {
   income: number;
   expense: number;
   net: number;
+  /** 全年投資；不含在 expense 內 */
+  investment: number;
+  /** 該帳本有投資分類時為 true，年度總表才顯示投資合計與剩餘現金 */
+  hasInvestment: boolean;
   recordedMonths: number;
-  /** 12 欄：每月收入、支出、結餘（不含年度額外開銷）；該月沒有交易為 null */
-  monthly: ({ income: number; expense: number; net: number } | null)[];
+  /** 12 欄：每月收入、支出、投資、結餘（不含年度額外開銷）；該月沒有交易為 null */
+  monthly: ({ income: number; expense: number; investment: number; net: number } | null)[];
   rows: YearCategoryRow[];
   extras: (YearExtraExpense & { categoryName: string; payerName: string })[];
 }
@@ -66,6 +70,10 @@ export const summaryApi = {
 
   createYearExtra: (draft: Omit<YearExtraExpense, "id">) =>
     http.post<YearExtraExpense>("/summary/year-extras", draft).then((r) => r.data),
+
+  /** 年度不可改；分類只能換成同一本帳的支出分類 */
+  updateYearExtra: (id: number, patch: Partial<Omit<YearExtraExpense, "id" | "year">>) =>
+    http.patch<YearExtraExpense>("/summary/year-extras/" + id, patch).then((r) => r.data),
 
   removeYearExtra: (id: number) =>
     http.delete<void>("/summary/year-extras/" + id).then((r) => r.data),

@@ -15,7 +15,9 @@ import IconButton from "@/components/base/IconButton.vue";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { summaryApi, type YearSummaryPayload } from "@/api/summary";
 import { useScopeStore } from "@/stores/scope";
+import { useAuthStore } from "@/stores/auth";
 import { useCategoriesStore } from "@/stores/categories";
+import { normalizeError } from "@/api/client";
 import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
 import { money } from "@/utils/format";
@@ -24,6 +26,7 @@ import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 const cats = useCategoriesStore();
 const members = useMembersStore();
 const ui = useUiStore();
+const auth = useAuthStore();
 
 const thisYear = new Date().getFullYear();
 const year = ref(thisYear);
@@ -34,6 +37,8 @@ const initialLoading = ref(true);
 const error = ref<LoadErrorKind | null>(null);
 
 interface ExtraForm {
+  /** 有值＝編輯既有的項目 */
+  id?: number;
   name: string;
   amount: string;
   mainCategoryId: number;
@@ -42,7 +47,12 @@ interface ExtraForm {
 const form = ref<ExtraForm | null>(null);
 
 const yearOptions = computed(() => [thisYear, thisYear - 1, thisYear - 2]);
-const categoryOptions = computed(() => cats.selectable.filter((c) => c.type === "expense"));
+/** 啟用中的支出分類；編輯時原本的分類若已停用也保留在選單裡 */
+const categoryOptions = computed(() => {
+  const options = cats.selectable.filter((c) => c.type === "expense");
+  const original = form.value?.id ? cats.byId(form.value.mainCategoryId) : undefined;
+  return original && !options.some((c) => c.id === original.id) ? [...options, original] : options;
+});
 
 /** 每月平均一律 ÷ 12（不看已記錄月份或分類存在月份），見 docs/requirements G-3。 */
 const perMonth = (v: number) => money(v / 12);
@@ -65,15 +75,22 @@ const footer = computed(() => {
 });
 
 /**
- * 底部的收入合計、月結餘列。
+ * 底部的收入合計、月結餘列（支出合計另外寫在模板裡，排第 2）。
  * 各月結餘不含年度額外開銷（它不分攤到單月）；月結餘列的年度總計＝年度結餘：
  * 全年收入 − 支出合計的年度總計（含額外開銷），額外開銷欄以負數列出差額。
+ *
+ * 帳本有投資分類時再加投資合計、剩餘現金兩列（個人帳規格 6.3）：投資不算支出，
+ * 月結餘＝收入 − 支出，投資還沒扣，所以標成「月結餘（含投資）」；剩餘現金＝月結餘 − 投資。
+ * 年度總計的算法和家庭帳一樣，含年度額外開銷。家庭帳沒有投資，不加這兩列。
  */
 const balanceRows = computed(() => {
   const monthly = data.value?.monthly ?? [];
-  return [
+  const netExtra = footer.value.extra ? -footer.value.extra : null;
+  const netTotal = (data.value?.income ?? 0) - footer.value.total;
+  const rows = [
     {
       label: "收入合計",
+      order: 1,
       months: monthly.map((m) => m?.income ?? null),
       extra: null as number | null,
       total: data.value?.income ?? 0,
@@ -81,15 +98,41 @@ const balanceRows = computed(() => {
       signed: false,
     },
     {
-      label: "月結餘",
+      label: netLabel.value,
+      order: 4,
       months: monthly.map((m) => m?.net ?? null),
-      extra: footer.value.extra ? -footer.value.extra : null,
-      total: (data.value?.income ?? 0) - footer.value.total,
+      extra: netExtra,
+      total: netTotal,
+      avg: perMonth,
+      signed: true,
+    },
+  ];
+  if (!data.value?.hasInvestment) return rows;
+  return [
+    ...rows,
+    {
+      label: "投資合計",
+      order: 3,
+      months: monthly.map((m) => m?.investment ?? null),
+      extra: null as number | null,
+      total: data.value.investment,
+      avg: perMonth,
+      signed: false,
+    },
+    {
+      label: "剩餘現金",
+      order: 5,
+      months: monthly.map((m) => (m === null ? null : m.net - m.investment)),
+      extra: netExtra,
+      total: netTotal - data.value.investment,
       avg: perMonth,
       signed: true,
     },
   ];
 });
+/** 個人帳有投資時，月結餘還沒扣投資，標明「含投資」 */
+const netLabel = computed(() => (data.value?.hasInvestment ? "月結餘（含投資）" : "月結餘"));
+const yearNet = computed(() => balanceRows.value[1]!.total);
 
 /** 結餘為負時標紅 */
 const netClass = (v: number | null) => (v !== null && v < 0 ? "text-danger" : "text-fg-1");
@@ -125,7 +168,8 @@ function openNew() {
     name: "",
     amount: "",
     mainCategoryId: categoryOptions.value[0]?.id ?? 1,
-    payerId: members.active[0]?.id ?? 1,
+    // 個人帳的支付者固定是本人
+    payerId: (scope.isPersonal ? auth.user?.id : members.active[0]?.id) ?? 1,
   };
 }
 
@@ -134,16 +178,26 @@ async function submitExtra() {
   if (!v) return;
   if (!v.name.trim()) return ui.flash("請填寫項目名稱", "danger");
   if (!v.amount || Number(v.amount) <= 0) return ui.flash("請填寫金額", "danger");
-  await summaryApi.createYearExtra({
-    year: year.value,
-    name: v.name.trim(),
-    amount: Number(v.amount),
-    mainCategoryId: v.mainCategoryId,
-    payerId: v.payerId,
-  });
-  ui.flash("已新增年度額外開銷「" + v.name.trim() + "」");
+  const fields = { name: v.name.trim(), amount: Number(v.amount), mainCategoryId: v.mainCategoryId, payerId: v.payerId };
+  try {
+    if (v.id) await summaryApi.updateYearExtra(v.id, fields);
+    else await summaryApi.createYearExtra({ year: year.value, ...fields });
+  } catch (e) {
+    return ui.flash(normalizeError(e).message, "danger");
+  }
+  ui.flash((v.id ? "已更新年度額外開銷「" : "已新增年度額外開銷「") + fields.name + "」");
   form.value = null;
   await load();
+}
+
+function openEdit(extra: YearSummaryPayload["extras"][number]) {
+  form.value = {
+    id: extra.id,
+    name: extra.name,
+    amount: String(extra.amount),
+    mainCategoryId: extra.mainCategoryId,
+    payerId: extra.payerId,
+  };
 }
 
 /** 待確認刪除的年度額外開銷；此表是實體刪除，刪了無法復原，一律先確認。 */
@@ -169,8 +223,16 @@ async function confirmRemoveExtra() {
 }
 
 const scope = useScopeStore();
+/**
+ * 年度額外開銷跟著分類屬於哪本帳：家庭帳限管理者，個人帳本人就能新增、刪除（個人帳第 2 批）。
+ */
+const canEditExtras = computed(() => scope.isPersonal || auth.isAdmin);
 watch(year, load);
-watch(() => scope.current, load);
+// 換帳本：分類選單也換成那本帳的
+watch(
+  () => scope.current,
+  () => Promise.all([cats.load(), load()])
+);
 onMounted(async () => {
   await Promise.all([cats.load(), members.load()]);
   await load();
@@ -193,7 +255,7 @@ onMounted(async () => {
       >
         <option v-for="y in yearOptions" :key="y" :value="y">{{ y }} 年</option>
       </select>
-      <AppButton v-if="!scope.isPersonal" variant="action" icon="add" @click="openNew">新增年度額外開銷</AppButton>
+      <AppButton v-if="canEditExtras" variant="action" icon="add" @click="openNew">新增年度額外開銷</AppButton>
     </template>
 
     <div class="md:hidden">
@@ -216,10 +278,14 @@ onMounted(async () => {
           /></div>
         <div class="md:pl-5 md:border-l">
           <MetricStat
-            label="結餘"
-            :value="data ? balanceRows[1]!.total : null"
+            :label="data?.hasInvestment ? '結餘（含投資）' : '結餘'"
+            :value="data ? yearNet : null"
             size="md"
-            :hint="'包含年度額外開銷' + (footer.extra ? ' ' + money(footer.extra) : '')"
+            :hint="
+              data?.hasInvestment
+                ? '含投資；剩餘現金 ' + money(yearNet - data.investment)
+                : '包含年度額外開銷' + (footer.extra ? ' ' + money(footer.extra) : '')
+            "
           />
         </div>
         <div class="md:pl-5 md:border-l">
@@ -305,7 +371,7 @@ onMounted(async () => {
             </span>
           </div>
 
-          <!-- 底部合計：收入合計 → 支出合計 → 月結餘（對應試算表的順序） -->
+          <!-- 底部合計：收入合計 → 支出合計 →（投資合計）→ 月結餘 →（剩餘現金），對應試算表的順序 -->
           <div class="flex flex-col">
           <div
             class="order-2 grid items-center h-[52px] bg-surface border-t text-[12.5px]"
@@ -332,8 +398,7 @@ onMounted(async () => {
             v-for="b in balanceRows"
             :key="b.label"
             class="grid items-center h-[52px] bg-surface border-t text-[12.5px]"
-            :class="b.signed ? 'order-3' : 'order-1'"
-            :style="{ gridTemplateColumns: '150px repeat(12,minmax(72px,1fr)) 88px 108px 100px 96px 92px' }"
+            :style="{ order: b.order, gridTemplateColumns: '150px repeat(12,minmax(72px,1fr)) 88px 108px 100px 96px 92px' }"
           >
             <span
               class="sticky left-0 z-[2] h-[52px] flex items-center px-4 bg-surface box-border shadow-[1px_0_0_rgba(0,0,0,.09)] font-bold text-fg-1"
@@ -369,10 +434,14 @@ onMounted(async () => {
     <div class="md:hidden flex flex-col gap-3.5">
       <AppCard v-if="data" pad="compact">
         <div class="flex items-center gap-2">
-          <span class="text-[14.5px] font-bold text-fg-1">月結餘</span>
-          <span class="ml-auto text-[16px] font-bold tnum" :class="netClass(balanceRows[1]!.total)">
-            年度結餘 {{ money(balanceRows[1]!.total) }}
+          <span class="text-[14.5px] font-bold text-fg-1">{{ netLabel }}</span>
+          <span class="ml-auto text-[16px] font-bold tnum" :class="netClass(yearNet)">
+            年度結餘 {{ money(yearNet) }}
           </span>
+        </div>
+        <div v-if="data.hasInvestment" class="mt-1.5 flex gap-4 text-[11px] text-fg-3">
+          <span>投資 {{ money(data.investment) }}</span>
+          <span :class="netClass(yearNet - data.investment)">剩餘現金 {{ money(yearNet - data.investment) }}</span>
         </div>
         <div class="mt-3 pt-3 border-t overflow-x-auto">
           <div class="flex gap-3 min-w-max">
@@ -383,6 +452,9 @@ onMounted(async () => {
               </span>
               <span class="font-mono text-[10px] text-fg-4 tnum">收 {{ m === null ? "—" : money(m.income) }}</span>
               <span class="font-mono text-[10px] text-fg-4 tnum">支 {{ m === null ? "—" : money(m.expense) }}</span>
+              <span v-if="data.hasInvestment" class="font-mono text-[10px] text-fg-4 tnum">
+                投 {{ m === null ? "—" : money(m.investment) }}
+              </span>
             </span>
           </div>
         </div>
@@ -419,28 +491,31 @@ onMounted(async () => {
         v-for="e in data.extras"
         :key="e.id"
         class="grid items-center gap-3 px-4 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px] md:px-5"
-        :style="{ gridTemplateColumns: 'minmax(0,1fr) 96px 76px 120px 44px' }"
+        :style="{ gridTemplateColumns: 'minmax(0,1fr) 96px 76px 120px 72px' }"
       >
         <span class="text-fg-1 truncate">{{ e.name }}</span>
         <span class="text-fg-3">{{ e.categoryName }}</span>
         <span class="text-fg-3">{{ e.payerName }}</span>
         <span class="text-right text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
-        <span class="flex justify-end">
-          <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e)" />
+        <span class="flex justify-end gap-0.5">
+          <template v-if="canEditExtras">
+            <IconButton icon="edit" label="編輯" :size="32" @click="openEdit(e)" />
+            <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e)" />
+          </template>
         </span>
       </div>
     </AppCard>
 
     <AppDialog
       :open="!!form"
-      title="新增年度額外開銷"
+      :title="form?.id ? '編輯年度額外開銷' : '新增年度額外開銷'"
       subtitle="不列入任何單月，但計入該分類的年度總計"
       @close="form = null"
     >
       <template v-if="form">
         <FormField label="項目名稱"><TextInput v-model="form.name" placeholder="例如 日本家庭旅遊" /></FormField>
         <FormField label="金額"><AmountInput v-model="form.amount" /></FormField>
-        <div class="flex flex-col gap-[7px]">
+        <div v-if="!scope.isPersonal" class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">記帳者</span>
           <SegmentedControl
             :options="members.active.map((m) => ({ value: String(m.id), label: m.name }))"
@@ -458,7 +533,7 @@ onMounted(async () => {
         </FormField>
       </template>
       <template #footer>
-        <AppButton variant="primary" size="lg" full-width @click="submitExtra">新增</AppButton>
+        <AppButton variant="primary" size="lg" full-width @click="submitExtra">{{ form?.id ? "儲存變更" : "新增" }}</AppButton>
         <AppButton size="lg" @click="form = null">取消</AppButton>
       </template>
     </AppDialog>
@@ -487,7 +562,7 @@ onMounted(async () => {
     </AppDialog>
 
     <template #fab>
-      <FloatingActionButton v-if="!scope.isPersonal" label="新增額外開銷" @click="openNew" />
+      <FloatingActionButton v-if="canEditExtras" label="新增額外開銷" @click="openNew" />
     </template>
   </AppShell>
 </template>

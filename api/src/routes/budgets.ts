@@ -36,7 +36,8 @@ budgetRoutes.put("/", requireAdmin, zValidator("json", budgetUpsertSchema), asyn
   const { month, mainCategoryId, amount } = c.req.valid("json");
 
   const [cat] = await db.select().from(mainCategories).where(eq(mainCategories.id, mainCategoryId)).limit(1);
-  if (!cat) throw badRequest("分類不存在");
+  // 個人預算（PL2-03）尚未開放：只能設定家庭分類的預算
+  if (!cat || cat.ownerId != null) throw badRequest("分類不存在");
   // 僅浮動支出可設預算；固定支出由訂閱推算，收入不設目標
   if (cat.type !== "expense" || cat.nature !== "floating") {
     throw badRequest("僅浮動支出分類可設定預算");

@@ -17,7 +17,8 @@ import { badRequest, forbidden, notFound } from "../lib/errors.js";
 import { monthRange } from "../lib/dates.js";
 import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
 import { findView, toView, transactionViewQuery } from "../services/views.js";
-import { canSeeTransaction, resolveScope, txScope } from "../services/scope.js";
+import { isInScope } from "../services/categories.js";
+import { canSeeTransaction, FAMILY, resolveScope, txScope, type Scope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 
@@ -72,7 +73,7 @@ transactionRoutes.post("/", zValidator("json", transactionDraftSchema), async (c
     if (scope.kind === "personal") throw badRequest("個人帳不可代記他人");
     await assertCanAssignPayer(user, payerId);
   }
-  const names = await assertCategoryMatches(draft.type, draft.mainCategoryId, draft.subCategoryId);
+  const names = await assertCategoryMatches(draft.type, draft.mainCategoryId, draft.subCategoryId, scope);
 
   const [row] = await db
     .insert(transactions)
@@ -121,7 +122,13 @@ transactionRoutes.patch("/:id", idParam, zValidator("json", transactionPatchSche
 
   const nextMain = patch.mainCategoryId === undefined ? current.mainCategoryId : patch.mainCategoryId;
   const nextSub = patch.subCategoryId === undefined ? current.subCategoryId : patch.subCategoryId;
-  const names = await assertCategoryMatches(current.type, nextMain, nextSub);
+  // 交易建立後不能換帳本，分類也只能換成同一本帳的
+  const names = await assertCategoryMatches(
+    current.type,
+    nextMain,
+    nextSub,
+    current.ownerId == null ? FAMILY : { kind: "personal", ownerId: current.ownerId }
+  );
 
   const fields = ["mainCategoryId", "subCategoryId", "amount", "date", "note", "payerId"] as const;
   const diffs = fields
@@ -197,13 +204,14 @@ async function assertCanAssignPayer(user: AuthUser, payerId: number): Promise<vo
 }
 
 /**
- * 分類須與收支別一致，子分類須隸屬該主分類（歸屬不可搬移）。
+ * 分類須屬於交易所在的帳本、與收支別一致，子分類須隸屬該主分類（歸屬不可搬移）。
  * 回傳當下的分類名稱，供寫入快照。
  */
 async function assertCategoryMatches(
-  type: "expense" | "income",
+  type: "expense" | "income" | "investment",
   mainCategoryId: number | null,
-  subCategoryId: number | null
+  subCategoryId: number | null,
+  scope: Scope
 ): Promise<{ main: string | null; sub: string | null }> {
   if (mainCategoryId == null) {
     if (subCategoryId != null) throw badRequest("未選主分類時不可指定子分類");
@@ -211,8 +219,8 @@ async function assertCategoryMatches(
   }
 
   const [main] = await db.select().from(mainCategories).where(eq(mainCategories.id, mainCategoryId)).limit(1);
-  // 第 1 批的個人交易也沿用家庭分類；個人分類（owner_id 有值）要到第 2 批才開放
-  if (!main || main.ownerId != null) throw badRequest("分類不存在");
+  // 個人帳第 2 批起分類分家庭與個人：家庭交易只能用家庭分類，個人交易只能用本人的分類
+  if (!main || !isInScope(main, scope)) throw badRequest("分類不存在");
   if (main.type !== type) throw badRequest("分類與收支別不符");
 
   if (subCategoryId == null) return { main: main.name, sub: null };

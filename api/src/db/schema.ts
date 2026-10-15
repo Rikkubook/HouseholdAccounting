@@ -30,8 +30,8 @@ export const mainCategories = pgTable("main_categories", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   name: text("name").notNull(),
   icon: text("icon").notNull(),
-  type: text("type", { enum: ["expense", "income"] }).notNull(),
-  /** 收入分類必為 null */
+  type: text("type", { enum: ["expense", "income", "investment"] }).notNull(),
+  /** 收入、投資分類必為 null */
   nature: text("nature", { enum: ["floating", "fixed"] }),
   sortOrder: integer("sort_order").notNull(),
   isActive: boolean("is_active").notNull().default(true),
@@ -58,7 +58,7 @@ export const subCategories = pgTable("sub_categories", {
 export const transactions = pgTable("transactions", {
   id: integer("id").primaryKey().generatedByDefaultAsIdentity(),
   /** 建立後不可修改 */
-  type: text("type", { enum: ["expense", "income"] }).notNull(),
+  type: text("type", { enum: ["expense", "income", "investment"] }).notNull(),
   mainCategoryId: integer("main_category_id"),
   subCategoryId: integer("sub_category_id"),
   amount: integer("amount").notNull(),

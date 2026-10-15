@@ -4,9 +4,12 @@ import { subscriptionsApi, type SubscriptionDraft } from "@/api/subscriptions";
 import type { Subscription } from "@/types/models";
 import { displayChargeDate, monthlyEquivalent, todayISO } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
+import { activeScope, type ScopeName } from "@/stores/scope";
 
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
   const items = ref<Subscription[]>([]);
+  /** items 是哪一本帳的訂閱（個人訂閱 PL2-02） */
+  const scope = ref<ScopeName>("family");
   const loading = ref(false);
   /** 只在第一次載入完成前為 true，供頁面判斷是否顯示整頁載入畫面。 */
   const initialLoading = ref(true);
@@ -34,11 +37,15 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
     return days <= 7 ? days + " 天後" : "";
   }
 
-  async function load() {
+  /** 預設載入目前帳本的訂閱；預算頁只看家庭帳，固定傳 "family"。換帳本時先清空 */
+  async function load(target: ScopeName = activeScope()) {
     loading.value = true;
     error.value = null;
+    if (target !== scope.value) items.value = [];
+    scope.value = target;
     try {
-      items.value = await subscriptionsApi.list();
+      const list = await subscriptionsApi.list(target);
+      if (scope.value === target) items.value = list;
     } catch (e) {
       error.value = toLoadErrorKind(e);
     } finally {
@@ -64,7 +71,8 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
     activeCountByPayer,
     dueLabel,
     load,
-    create: async (d: SubscriptionDraft) => upsert(await subscriptionsApi.create(d)),
+    scope,
+    create: async (d: SubscriptionDraft) => upsert(await subscriptionsApi.create(d, scope.value)),
     update: async (id: number, p: Partial<SubscriptionDraft>) => upsert(await subscriptionsApi.update(id, p)),
     setActive: async (id: number, isActive: boolean) => upsert(await subscriptionsApi.setActive(id, isActive)),
   };

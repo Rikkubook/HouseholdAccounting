@@ -8,10 +8,11 @@ import { z } from "zod";
 /* ── 基本型別 ───────────────────────────────────────── */
 
 export const roleSchema = z.enum(["admin", "member"]);
-export const txTypeSchema = z.enum(["expense", "income"]);
+/** investment = 投資：錢離開錢包但仍是自己的，不算支出也不算收入（個人帳第 2 批） */
+export const txTypeSchema = z.enum(["expense", "income", "investment"]);
 export const categoryNatureSchema = z.enum(["floating", "fixed"]);
 export const billingCycleSchema = z.enum(["monthly", "yearly"]);
-/** 帳本範圍：family = 家庭帳，personal = 登入者的個人帳（僅管理者） */
+/** 帳本範圍：family = 家庭帳，personal = 登入者自己的個人帳 */
 export const scopeSchema = z.enum(["family", "personal"]);
 
 export const monthSchema = z
@@ -212,7 +213,7 @@ export const transactionPatchSchema = z
 export const transactionQuerySchema = z.object({
   scope: scopeSchema.default("family"),
   month: monthSchema.optional(),
-  type: z.enum(["all", "expense", "income"]).default("all"),
+  type: z.enum(["all", "expense", "income", "investment"]).default("all"),
   mainCategoryId: idSchema.nullish(),
   payerId: idSchema.nullish(),
   /** 僅搜尋備註（specs/05-交易列表頁.md 規則 9）。 */
@@ -243,8 +244,8 @@ export const mainCategoryDraftSchema = z
     type: txTypeSchema,
     nature: categoryNatureSchema.nullable(),
   })
-  .refine((v) => (v.type === "income" ? v.nature === null : v.nature !== null), {
-    message: "支出分類須指定浮動或固定；收入分類不得有性質",
+  .refine((v) => (v.type === "expense" ? v.nature !== null : v.nature === null), {
+    message: "支出分類須指定浮動或固定；收入與投資分類不得有性質",
     path: ["nature"],
   });
 
@@ -285,6 +286,12 @@ export const yearExtraDraftSchema = z.object({
   payerId: z.number().int().positive(),
 });
 
+/** 年度不可改；分類只能換成同一本帳的支出分類 */
+export const yearExtraPatchSchema = yearExtraDraftSchema
+  .omit({ year: true })
+  .partial()
+  .refine((v) => Object.keys(v).length > 0, "沒有要修改的欄位");
+
 export const statsQuerySchema = z.object({
   range: z.enum(["month", "year"]).default("month"),
   /** month=YYYY-MM；year=YYYY */
@@ -292,6 +299,9 @@ export const statsQuerySchema = z.object({
   payerId: idSchema.nullish(),
   scope: scopeSchema.default("family"),
 });
+
+/** 分類 API 的帳本範圍：家庭分類只有管理者能改，個人分類每個人改自己的 */
+export const categoryScopeQuerySchema = z.object({ scope: scopeSchema.default("family") });
 
 export const setActiveSchema = z.object({ isActive: z.boolean() });
 export const reorderSchema = z.object({ orderedIds: z.array(z.number().int().positive()).min(1) });

@@ -1,5 +1,6 @@
 import { http } from "./client";
 import type { MainCategory, TxType, CategoryNature } from "@/types/models";
+import type { ScopeName } from "@/stores/scope";
 
 export interface MainCategoryDraft {
   name: string;
@@ -9,11 +10,12 @@ export interface MainCategoryDraft {
 }
 
 export const categoriesApi = {
-  list: (includeArchived = true) =>
-    http.get<MainCategory[]>("/categories", { params: { includeArchived } }).then((r) => r.data),
+  /** 家庭分類或登入者自己的個人分類；個人帳第一次讀取時後端會自動建立「其他」 */
+  list: (scope: ScopeName, includeArchived = true) =>
+    http.get<MainCategory[]>("/categories", { params: { includeArchived, scope } }).then((r) => r.data),
 
-  createMain: (draft: MainCategoryDraft) =>
-    http.post<MainCategory>("/categories", draft).then((r) => r.data),
+  createMain: (draft: MainCategoryDraft, scope: ScopeName) =>
+    http.post<MainCategory>("/categories", draft, { params: { scope } }).then((r) => r.data),
 
   updateMain: (id: number, patch: Partial<MainCategoryDraft>) =>
     http.patch<MainCategory>("/categories/" + id, patch).then((r) => r.data),
@@ -25,8 +27,8 @@ export const categoriesApi = {
   restoreMain: (id: number) =>
     http.post<MainCategory>("/categories/" + id + "/restore").then((r) => r.data),
 
-  reorderMain: (orderedIds: number[]) =>
-    http.post<void>("/categories/reorder", { orderedIds }).then((r) => r.data),
+  reorderMain: (orderedIds: number[], scope: ScopeName) =>
+    http.post<void>("/categories/reorder", { orderedIds }, { params: { scope } }).then((r) => r.data),
 
   /** 歸屬主分類只在新增時決定，不可搬移。 */
   createSub: (mainCategoryId: number, name: string) =>

@@ -60,8 +60,8 @@ export async function buildDashboard(month: string, scope: Scope = FAMILY): Prom
           .where(and(scheduled, eq(transactions.type, "expense")))
       ),
       timed("dashboard.monthBudgets", db.select().from(budgets).where(and(eq(budgets.month, month), budgetScope(scope)))),
-      // 第 1 批的個人交易沿用家庭分類，分類清單一律取家庭的；預算則依範圍（個人帳尚無預算）
-      timed("dashboard.categories", listCategories(true)),
+      // 分類依帳本：家庭帳取家庭分類，個人帳取本人的分類（個人帳尚無預算）
+      timed("dashboard.categories", listCategories(true, scope)),
       timed("dashboard.fixedTotal", fixedTotal(month, scope)),
       /**
        * 一次抓整月交易（含預定支出），下面同時導出「整體最近交易」與
@@ -85,16 +85,21 @@ export async function buildDashboard(month: string, scope: Scope = FAMILY): Prom
 
   const income = totals.find((t) => t.type === "income")?.amount ?? 0;
   const expense = totals.find((t) => t.type === "expense")?.amount ?? 0;
+  const investment = totals.find((t) => t.type === "investment")?.amount ?? 0;
+  const spentMap = new Map(byCategory.map((r) => [r.mainCategoryId, r.amount]));
+
   const summary: MonthSummary = {
     month,
     income,
     expense,
+    // 結餘＝收入 − 支出（含投資，投資還沒扣）；剩餘現金＝net − investment 由前端算
     net: income - expense,
+    investment,
+    hasInvestment: categories.some((c) => c.type === "investment") || investment > 0,
+    // 兩本帳都用訂閱月換算（年繳 ÷12）；個人帳算本人的個人訂閱
     fixedTotal: fixed,
     scheduledExpense: scheduledTotal[0]?.amount ?? 0,
   };
-
-  const spentMap = new Map(byCategory.map((r) => [r.mainCategoryId, r.amount]));
   const scheduledMap = new Map(scheduledByCategory.map((r) => [r.mainCategoryId, r.amount]));
   const budgetMap = new Map(monthBudgets.map((b) => [b.mainCategoryId, b.amount]));
 

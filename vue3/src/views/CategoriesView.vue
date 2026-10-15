@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -15,14 +14,17 @@ import InlineAlert from "@/components/base/InlineAlert.vue";
 import EmptyState from "@/components/base/EmptyState.vue";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
 import { useCategoriesStore } from "@/stores/categories";
+import { useScopeStore } from "@/stores/scope";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
 import type { CategoryNature, MainCategory, TxType } from "@/types/models";
 
 const cats = useCategoriesStore();
 const ui = useUiStore();
+/** 家庭帳管家庭分類（限管理者）；個人帳管自己的個人分類，每位成員都可以 */
+const scope = useScopeStore();
 
-type Filter = "all" | "floating" | "fixed" | "income";
+type Filter = "all" | "floating" | "fixed" | "income" | "investment";
 const filter = ref<Filter>("all");
 const selectedId = ref<number | null>(null);
 
@@ -43,12 +45,19 @@ interface SubForm {
 }
 const form = ref<MainForm | SubForm | null>(null);
 
-const filterOptions = [
+/** 投資只有個人帳有（家庭帳沒有投資，2026-10-15 使用者決定） */
+const filterOptions = computed(() => [
   { value: "all", label: "全部" },
   { value: "floating", label: "浮動支出" },
   { value: "fixed", label: "固定支出" },
   { value: "income", label: "收入" },
-];
+  ...(scope.isPersonal ? [{ value: "investment", label: "投資" }] : []),
+]);
+const typeOptions = computed(() => [
+  { value: "expense", label: "支出" },
+  { value: "income", label: "收入" },
+  ...(scope.isPersonal ? [{ value: "investment", label: "投資" }] : []),
+]);
 
 /** 停用的分類集中排在最下面，啟用與停用兩組各自維持原本順序。 */
 function byActiveFirst<T extends { isActive: boolean }>(items: T[]): T[] {
@@ -59,7 +68,7 @@ const visible = computed(() =>
   byActiveFirst(
     cats.items.filter((c) => {
       if (filter.value === "all") return true;
-      if (filter.value === "income") return c.type === "income";
+      if (filter.value === "income" || filter.value === "investment") return c.type === filter.value;
       return c.type === "expense" && c.nature === filter.value;
     })
   )
@@ -69,6 +78,7 @@ const subs = computed(() => byActiveFirst(selected.value?.subCategories ?? []));
 
 function tagOf(c: MainCategory) {
   if (c.type === "income") return { label: "收入", tone: "success" as const };
+  if (c.type === "investment") return { label: "投資", tone: "outline" as const };
   return c.nature === "fixed"
     ? { label: "固定支出", tone: "neutral" as const }
     : { label: "浮動支出", tone: "brand" as const };
@@ -105,13 +115,16 @@ async function submit() {
   if (!v.name.trim()) return ui.flash("請填寫名稱", "danger");
   try {
     if (v.kind === "main") {
-      const payload = { name: v.name.trim(), icon: v.icon, type: v.type, nature: v.type === "income" ? null : v.nature };
+      // 只有支出分類有性質；收入、投資一律為 null
+      const payload = { name: v.name.trim(), icon: v.icon, type: v.type, nature: v.type === "expense" ? v.nature : null };
       if (v.id) {
         await cats.updateMain(v.id, payload);
         ui.flash("已更新主分類「" + payload.name + "」，全部期間同步顯示新名稱");
       } else {
         await cats.createMain(payload);
-        ui.flash("已新增主分類「" + payload.name + "」，請到預算管理設定上限");
+        ui.flash(
+          "已新增主分類「" + payload.name + "」" + (scope.isPersonal || payload.nature !== "floating" ? "" : "，請到預算管理設定上限")
+        );
       }
     } else if (v.subId) {
       await cats.renameSub(v.subId, v.name.trim());
@@ -156,18 +169,27 @@ async function toggleSub(s: { id: number; isActive: boolean; name: string }) {
 }
 
 onMounted(() => cats.load());
+
+// 換帳本：改顯示另一本帳的分類
+watch(
+  () => scope.current,
+  () => {
+    selectedId.value = null;
+    filter.value = "all";
+    cats.load();
+  }
+);
 </script>
 
 <template>
   <AppShell
     title="分類設定"
-    subtitle="分類為主檔，異動立即全域生效"
+    :subtitle="scope.isPersonal ? '個人分類只有你自己看得到，只用在個人帳' : '分類為主檔，異動立即全域生效'"
     back-to="/"
     :loading="cats.initialLoading"
     :error="cats.error"
     @retry="cats.load()"
   >
-    <FamilyOnlyNotice feature="分類設定" />
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNewMain">新增主分類</AppButton>
     </template>
@@ -301,13 +323,13 @@ onMounted(() => cats.load());
           <div class="flex flex-col gap-[7px]">
             <span class="text-label text-fg-3">收支類型</span>
             <SegmentedControl
-              :options="[
-                { value: 'expense', label: '支出' },
-                { value: 'income', label: '收入' },
-              ]"
+              :options="typeOptions"
               :model-value="form.type"
               @update:model-value="form.type = $event as TxType"
             />
+            <span v-if="form.type === 'investment'" class="text-[10.5px] text-fg-4">
+              投資不算支出：首頁與年度彙整另外列出投資和剩餘現金
+            </span>
           </div>
 
           <div v-if="form.type === 'expense'" class="flex flex-col gap-[7px]">
@@ -320,7 +342,9 @@ onMounted(() => cats.load());
               :model-value="form.nature"
               @update:model-value="form.nature = $event as CategoryNature"
             />
-            <span class="text-[10.5px] text-fg-4">浮動支出會出現在首頁預算進度條</span>
+            <span class="text-[10.5px] text-fg-4">
+              {{ scope.isPersonal ? "浮動支出會出現在首頁的分類卡片" : "浮動支出會出現在首頁預算進度條" }}
+            </span>
           </div>
 
           <div class="flex flex-col gap-[7px]">

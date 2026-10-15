@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
+import { useScopeStore } from "@/stores/scope";
 
 const routes: RouteRecordRaw[] = [
   { path: "/login", name: "login", component: () => import("@/views/LoginView.vue"), meta: { public: true } },
@@ -23,14 +24,16 @@ const routes: RouteRecordRaw[] = [
     path: "/subscriptions",
     name: "subscriptions",
     component: () => import("@/views/SubscriptionsView.vue"),
-    meta: { admin: true },
+    // 家庭訂閱限管理者；個人帳模式下每位成員都能管自己的個人訂閱
+    meta: { admin: true, personalOpen: true },
   },
   { path: "/members", name: "members", component: () => import("@/views/MembersView.vue"), meta: { admin: true } },
   {
     path: "/categories",
     name: "categories",
     component: () => import("@/views/CategoriesView.vue"),
-    meta: { admin: true },
+    // 家庭分類限管理者；個人帳模式下每位成員都能管自己的個人分類
+    meta: { admin: true, personalOpen: true },
   },
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
@@ -45,6 +48,8 @@ router.beforeEach(async (to) => {
     if (!auth.isAuthenticated) return { name: "login" };
   }
   // ADMIN 頁面一般成員不可進入（側欄也不顯示）
-  if (to.meta.admin && !auth.isAdmin) return { name: "dashboard" };
+  if (to.meta.admin && !auth.isAdmin && !(to.meta.personalOpen && useScopeStore().isPersonal)) {
+    return { name: "dashboard" };
+  }
   return true;
 });

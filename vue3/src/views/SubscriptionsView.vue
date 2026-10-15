@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
-import { onMounted, ref } from "vue";
+import { onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -17,6 +16,8 @@ import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useUiStore } from "@/stores/ui";
+import { useAuthStore } from "@/stores/auth";
+import { useScopeStore } from "@/stores/scope";
 import { normalizeError } from "@/api/client";
 import { INSTALLMENTS, displayChargeDate, installmentsPaid, todayISO } from "@/utils/format";
 import type { BillingCycle, Subscription } from "@/types/models";
@@ -25,6 +26,9 @@ const cats = useCategoriesStore();
 const members = useMembersStore();
 const store = useSubscriptionsStore();
 const ui = useUiStore();
+const auth = useAuthStore();
+/** 家庭帳管家庭訂閱（限管理者）；個人帳管自己的個人訂閱，扣款人固定是本人（PL2-02） */
+const scope = useScopeStore();
 
 interface Form {
   id?: number;
@@ -44,7 +48,7 @@ function openNew() {
     amount: "",
     cycle: "monthly",
     nextChargeDate: todayISO(),
-    payerId: members.active[0]?.id ?? 1,
+    payerId: (scope.isPersonal ? auth.user?.id : members.active[0]?.id) ?? 1,
   };
 }
 
@@ -104,18 +108,23 @@ onMounted(async () => {
   await Promise.all([cats.load(), members.load()]);
   await store.load();
 });
+
+// 換帳本：改顯示另一本帳的訂閱
+watch(
+  () => scope.current,
+  () => Promise.all([cats.load(), store.load()])
+);
 </script>
 
 <template>
   <AppShell
     title="訂閱管理"
-    subtitle="固定支出的來源；停用不刪除"
+    :subtitle="scope.isPersonal ? '個人固定支出的來源，只有你自己看得到；停用不刪除' : '固定支出的來源；停用不刪除'"
     back-to="/"
     :loading="store.initialLoading"
     :error="store.error"
     @retry="store.load()"
   >
-    <FamilyOnlyNotice feature="訂閱" />
     <template #actions>
       <AppButton variant="action" icon="add" @click="openNew">新增訂閱</AppButton>
     </template>
@@ -189,7 +198,7 @@ onMounted(async () => {
           </span>
         </div>
 
-        <div class="flex flex-col gap-[7px]">
+        <div v-if="!scope.isPersonal" class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">扣款人</span>
           <SegmentedControl
             :options="members.active.map((m) => ({ value: String(m.id), label: m.name }))"

@@ -4,7 +4,7 @@ import type { TransactionDraft, TransactionPatch, TransactionRevision, Transacti
 
 export interface TransactionQuery {
   month?: string;
-  type?: "all" | "expense" | "income";
+  type?: "all" | "expense" | "income" | "investment";
   mainCategoryId?: number | null;
   payerId?: number | null;
   keyword?: string;

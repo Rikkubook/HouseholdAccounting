@@ -77,7 +77,7 @@ async function load(month: string) {
 }
 
 onMounted(async () => {
-  await Promise.all([cats.load(), subs.load()]);
+  await Promise.all([cats.load("family"), subs.load("family")]);
   await budgets.load();
 });
 </script>

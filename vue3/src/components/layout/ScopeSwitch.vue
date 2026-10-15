@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import { useRoute, useRouter } from "vue-router";
 import { NAV_ITEMS } from "@/router/nav";
+import { useAuthStore } from "@/stores/auth";
 import { useScopeStore, type ScopeName } from "@/stores/scope";
 
 /** 家庭帳／個人帳切換，所有成員都有。選中的一格白底、用目前帳本的品牌色。 */
 const scope = useScopeStore();
+const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
 
-/** 切到個人帳時，若正停在個人帳不顯示的頁面（成員管理），回到首頁 */
+/**
+ * 切換後若停在新帳本不顯示的頁面就回到首頁：切到個人帳時的成員管理；
+ * 一般成員切回家庭帳時的分類設定（家庭分類限管理者）。
+ */
 function pick(v: ScopeName) {
   scope.set(v);
-  if (v === "personal" && NAV_ITEMS.some((i) => i.familyOnly && i.name === route.name)) router.push("/");
+  const item = NAV_ITEMS.find((i) => i.name === route.name);
+  if (!item) return;
+  if (v === "personal" && item.familyOnly) router.push("/");
+  if (v === "family" && item.adminOnly && !auth.isAdmin) router.push("/");
 }
 
 const OPTIONS: { value: ScopeName; label: string; icon: string }[] = [
