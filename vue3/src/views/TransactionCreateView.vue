@@ -93,7 +93,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
 <template>
   <AppShell
     title="新增交易"
-    :subtitle="auth.isAdmin ? '可代記其他成員的帳' : '記帳者自動帶入登入者'"
+    :subtitle="auth.isAdmin && ledger === 'family' ? '可代記其他成員的帳' : '記帳者自動帶入登入者'"
     back-to="/"
     :loading="cats.initialLoading"
     :error="cats.error"
