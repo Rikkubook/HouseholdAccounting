@@ -19,6 +19,7 @@ const base: TransactionView = {
   isDeleted: false,
   sourceSubscriptionId: null,
   createdBy: 2,
+  ownerId: null,
   mainCategoryName: "食",
   subCategoryName: "食材",
   payerName: "太太",

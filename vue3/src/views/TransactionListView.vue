@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -21,6 +21,7 @@ import { useMembersStore } from "@/stores/members";
 import { useTransactionsStore } from "@/stores/transactions";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
+import { useScopeStore } from "@/stores/scope";
 import { RouterLink } from "vue-router";
 import { currentMonth } from "@/utils/format";
 import type { TransactionView } from "@/types/models";
@@ -30,6 +31,9 @@ const cats = useCategoriesStore();
 const members = useMembersStore();
 const store = useTransactionsStore();
 const ui = useUiStore();
+const scope = useScopeStore();
+// 切換帳本：清掉成員篩選（個人帳只有自己）並重新查詢
+watch(() => scope.current, () => store.setFilter({ payerId: null }));
 
 const editing = ref<TransactionView | null>(null);
 const editAmount = ref("");
@@ -69,10 +73,16 @@ const editSubOptions = computed(() => {
   return original && !active.some((sub) => sub.id === original.id) ? [...active, original] : active;
 });
 
-/** 記帳者僅管理者可換；訂閱產生的交易要換請改訂閱的扣款人。 */
-const canChangePayer = computed(() => auth.isAdmin && editing.value?.sourceSubscriptionId == null);
+/** 記帳者僅管理者可換；訂閱產生的交易要換請改訂閱的扣款人；個人帳交易不可換。 */
+const canChangePayer = computed(
+  () => auth.isAdmin && editing.value?.sourceSubscriptionId == null && editing.value?.ownerId == null
+);
 const payerLockedNote = computed(() =>
-  editing.value?.sourceSubscriptionId != null ? "訂閱產生的交易不可更換，請改訂閱的扣款人" : "只有管理者可以更換"
+  editing.value?.sourceSubscriptionId != null
+    ? "訂閱產生的交易不可更換，請改訂閱的扣款人"
+    : editing.value?.ownerId != null
+      ? "個人帳交易不可更換記帳者"
+      : "只有管理者可以更換"
 );
 
 /** 啟用中的成員；原記帳者若已停用也保留在選單裡（不改就不會送出），不會變空白。 */
@@ -185,6 +195,7 @@ onMounted(async () => {
             <option v-for="c in cats.selectable" :key="c.id" :value="c.id">{{ c.name }}</option>
           </select>
           <select
+            v-if="!scope.isPersonal"
             :value="store.query.payerId ?? ''"
             class="h-[38px] px-2.5 rounded-md border border-strong bg-surface text-[12.5px] text-fg-2 outline-none"
             @change="store.setFilter({ payerId: Number(($event.target as HTMLSelectElement).value) || null })"
@@ -207,10 +218,10 @@ onMounted(async () => {
 
     <AppCard pad="none">
       <div
-        class="hidden md:grid px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4"
+        class="hidden md:grid gap-2 px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4 whitespace-nowrap"
         :style="{ gridTemplateColumns: txGridColumns() }"
       >
-        <span>日期</span><span></span><span>子項目</span><span>記帳者</span>
+        <span>日期</span><span></span><span>子項目</span><span>記帳者</span><span>備註</span>
         <span class="text-right">金額</span><span></span>
       </div>
 

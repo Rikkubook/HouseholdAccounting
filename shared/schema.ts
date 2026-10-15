@@ -11,6 +11,8 @@ export const roleSchema = z.enum(["admin", "member"]);
 export const txTypeSchema = z.enum(["expense", "income"]);
 export const categoryNatureSchema = z.enum(["floating", "fixed"]);
 export const billingCycleSchema = z.enum(["monthly", "yearly"]);
+/** 帳本範圍：family = 家庭帳，personal = 登入者的個人帳（僅管理者） */
+export const scopeSchema = z.enum(["family", "personal"]);
 
 export const monthSchema = z
   .string()
@@ -98,6 +100,8 @@ export const transactionSchema = z.object({
   sourceSubscriptionId: z.number().int().nullable(),
   /** 實際輸入者；null = 系統自動產生（Cron 訂閱扣款） */
   createdBy: z.number().int().nullable(),
+  /** null = 家庭帳；有值 = 該成員的個人帳 */
+  ownerId: z.number().int().nullable(),
 });
 
 export const transactionViewSchema = transactionSchema.extend({
@@ -179,8 +183,10 @@ export const transactionDraftSchema = z.object({
   /** 可為未來日期（預定支出） */
   date: dateSchema,
   note: z.string().max(100).optional(),
-  /** 記帳者；省略＝登入者本人。指定他人僅限管理者，且須為啟用中的成員。 */
+  /** 記帳者；省略＝登入者本人。指定他人僅限管理者，且須為啟用中的成員；個人帳不可代記。 */
   payerId: z.number().int().positive().optional(),
+  /** 記在家庭帳或自己的個人帳；建立後不可更改 */
+  scope: scopeSchema.default("family"),
 });
 
 /**
@@ -200,6 +206,7 @@ export const transactionPatchSchema = z
   .refine((v) => Object.keys(v).length > 0, "沒有要修改的欄位");
 
 export const transactionQuerySchema = z.object({
+  scope: scopeSchema.default("family"),
   month: monthSchema.optional(),
   type: z.enum(["all", "expense", "income"]).default("all"),
   mainCategoryId: idSchema.nullish(),
@@ -279,6 +286,7 @@ export const statsQuerySchema = z.object({
   /** month=YYYY-MM；year=YYYY */
   period: z.string().regex(/^\d{4}(-(0[1-9]|1[0-2]))?$/, "期間格式錯誤"),
   payerId: idSchema.nullish(),
+  scope: scopeSchema.default("family"),
 });
 
 export const setActiveSchema = z.object({ isActive: z.boolean() });

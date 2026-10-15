@@ -65,6 +65,8 @@ export interface Transaction {
   sourceSubscriptionId: number | null;
   /** 實際輸入者；null = 系統自動產生（Cron 訂閱扣款） */
   createdBy: number | null;
+  /** null = 家庭帳；有值 = 該成員的個人帳 */
+  ownerId: number | null;
 }
 
 export interface TransactionRevision {
@@ -84,8 +86,10 @@ export interface TransactionDraft {
   amount: number;
   date: string;
   note?: string;
-  /** 省略＝登入者本人；指定他人僅限管理者 */
+  /** 省略＝登入者本人；指定他人僅限管理者（個人帳不可代記） */
   payerId?: number;
+  /** 記在家庭帳或自己的個人帳（僅管理者）；不傳則用目前切換的帳本 */
+  scope?: "family" | "personal";
 }
 
 export interface TransactionPatch {

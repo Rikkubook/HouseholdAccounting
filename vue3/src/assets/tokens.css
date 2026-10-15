@@ -21,6 +21,7 @@
   --brand-500: #6b5cf5;
   --brand-600: #5a44e0;
   --brand-tint: #f1eefe;
+  --brand-rgb: 107, 92, 245;
   --note: #9a8fe8;
   --brand-magenta: #b04bd6;
   --gradient-brand: linear-gradient(135deg, #6b5cf5, #b04bd6);
@@ -85,4 +86,16 @@
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   --dur-bar: 0.5s;
   --dur-hover: 0.15s;
+}
+
+/* 個人帳：依設計稿，整套品牌色換成青綠，一眼分出目前在哪本帳 */
+:root[data-ledger="personal"] {
+  --brand-500: #0f8f7a;
+  --brand-600: #0b7565;
+  --brand-tint: #e3f4f0;
+  --brand-rgb: 15, 143, 122;
+  /* 備註淡色：與家庭帳相同，取主色約加 32% 白 */
+  --note: #5cb3a5;
+  --brand-magenta: #4fb389; /* 漸層與載入圓環的終點色 */
+  --gradient-brand: linear-gradient(135deg, #0f8f7a, #4fb389);
 }

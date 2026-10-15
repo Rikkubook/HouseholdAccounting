@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { NAV_ITEMS } from "@/router/nav";
+import { navItemsFor } from "@/router/nav";
+import { useScopeStore } from "@/stores/scope";
+import ScopeSwitch from "@/components/layout/ScopeSwitch.vue";
 
 const route = useRoute();
 const auth = useAuthStore();
+const scope = useScopeStore();
 const appVersion = __APP_VERSION__;
 </script>
 
@@ -14,11 +17,13 @@ const appVersion = __APP_VERSION__;
   >
     <div class="flex items-center gap-2.5 px-5">
       <div class="w-[30px] h-[30px] rounded-md bg-brand" />
-      <div class="font-bold text-[15px] text-fg-1">家庭帳</div>
+      <div class="font-bold text-[15px] text-fg-1">{{ scope.isPersonal ? "個人帳" : "家庭帳" }}</div>
     </div>
 
+    <ScopeSwitch class="mx-2.5 -mt-2" />
+
     <div class="flex flex-col gap-0.5">
-      <template v-for="item in NAV_ITEMS" :key="item.name">
+      <template v-for="item in navItemsFor(auth.isAdmin, scope.isPersonal)" :key="item.name">
         <div
           v-if="item.adminDivider"
           class="mx-5 mt-2 mb-1 font-mono text-[10.5px] tracking-[0.14em] text-fg-4"

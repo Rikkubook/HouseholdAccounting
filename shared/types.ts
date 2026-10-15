@@ -10,6 +10,7 @@ export type Role = z.infer<typeof s.roleSchema>;
 export type TxType = z.infer<typeof s.txTypeSchema>;
 export type CategoryNature = z.infer<typeof s.categoryNatureSchema>;
 export type BillingCycle = z.infer<typeof s.billingCycleSchema>;
+export type ScopeName = z.infer<typeof s.scopeSchema>;
 
 export type Member = z.infer<typeof s.memberSchema>;
 export type SubCategory = z.infer<typeof s.subCategorySchema>;

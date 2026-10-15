@@ -5,7 +5,8 @@ import AppCard from "@/components/base/AppCard.vue";
 import ProgressBar from "@/components/base/ProgressBar.vue";
 import type { CategoryProgress } from "@/types/models";
 
-defineProps<{ category: CategoryProgress }>();
+/** hideBudgetLink：個人帳尚無個人預算，「設定預算」會連到家庭預算頁，所以不顯示 */
+defineProps<{ category: CategoryProgress; hideBudgetLink?: boolean }>();
 </script>
 
 <template>
@@ -18,7 +19,7 @@ defineProps<{ category: CategoryProgress }>();
 
       <!-- 未設預算：提示放在分類名稱旁 -->
       <RouterLink
-        v-if="category.budget === null"
+        v-if="category.budget === null && !hideBudgetLink"
         to="/budget"
         class="flex items-center gap-1 text-[11px] text-brand-500 whitespace-nowrap"
       >
@@ -38,8 +39,8 @@ defineProps<{ category: CategoryProgress }>();
       <div v-for="tx in category.recent" :key="tx.id" class="flex items-baseline gap-2 text-[12px]">
         <span class="font-mono text-[11px] text-fg-4">{{ shortDate(tx.date) }}</span>
         <span class="text-fg-2 whitespace-nowrap">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
-        <span v-if="tx.note" class="text-note text-[11px] truncate min-w-0">{{ tx.note }}</span>
         <span class="text-fg-4 text-[11px] whitespace-nowrap">{{ tx.payerName }}</span>
+        <span v-if="tx.note" class="text-note text-[11px] truncate min-w-0">{{ tx.note }}</span>
         <span class="ml-auto pl-2 text-fg-1 tnum whitespace-nowrap">{{ money(tx.amount) }}</span>
       </div>
       <RouterLink to="/transactions" class="text-[12px] text-brand-500 self-start">查看完整歷史 →</RouterLink>

@@ -2,13 +2,16 @@
 import { ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useAuthStore } from "@/stores/auth";
-import { NAV_ITEMS } from "@/router/nav";
+import { navItemsFor } from "@/router/nav";
+import { useScopeStore } from "@/stores/scope";
+import ScopeSwitch from "@/components/layout/ScopeSwitch.vue";
 
 defineProps<{ title: string }>();
 
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const scope = useScopeStore();
 const drawerOpen = ref(false);
 const appVersion = __APP_VERSION__;
 
@@ -30,6 +33,12 @@ function go(to: string) {
         <span class="material-symbols-rounded text-[22px]">menu</span>
       </button>
       <div class="text-[14.5px] font-bold text-fg-1">{{ title }}</div>
+      <!-- 目前的帳本 -->
+      <span
+        class="ml-auto px-2.5 py-1 rounded-pill bg-brand-tint text-brand-600 text-[11.5px]"
+      >
+        {{ scope.isPersonal ? "個人帳" : "家庭帳" }}
+      </span>
     </div>
 
     <Teleport to="body">
@@ -37,10 +46,11 @@ function go(to: string) {
         <div class="absolute left-0 top-0 bottom-0 w-[268px] bg-surface flex flex-col py-5" @click.stop>
           <div class="flex items-center gap-2.5 px-5 pb-4 border-b">
             <div class="w-[30px] h-[30px] rounded-md bg-brand" />
-            <div class="font-bold text-[15px] text-fg-1">家庭帳</div>
+            <div class="font-bold text-[15px] text-fg-1">{{ scope.isPersonal ? "個人帳" : "家庭帳" }}</div>
           </div>
+          <ScopeSwitch class="mx-2.5 mt-3" />
           <div class="flex flex-col gap-0.5 py-3 overflow-auto">
-            <template v-for="item in NAV_ITEMS" :key="item.name">
+            <template v-for="item in navItemsFor(auth.isAdmin, scope.isPersonal)" :key="item.name">
               <div
                 v-if="item.adminDivider"
                 class="mx-5 mt-2 mb-1 font-mono text-[10.5px] tracking-[0.14em] text-fg-4"

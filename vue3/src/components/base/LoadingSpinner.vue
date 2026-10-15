@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 旋轉圓環：track 底圈 + 品牌紫漸層弧。
+ * 旋轉圓環：track 底圈 + 品牌色漸層弧（個人帳為青綠）。
  * stopped 時停在當下角度（不歸零），弧改成錯誤色——同一個元件從載入切到失敗，看起來像轉到一半卡住。
  */
 import AppIcon from "@/components/base/AppIcon.vue";

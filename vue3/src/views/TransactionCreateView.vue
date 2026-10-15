@@ -14,6 +14,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useCategoriesStore } from "@/stores/categories";
 import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
+import { useScopeStore } from "@/stores/scope";
 import { todayISO } from "@/utils/format";
 import type { TxType } from "@/types/models";
 
@@ -22,6 +23,9 @@ const auth = useAuthStore();
 const cats = useCategoriesStore();
 const members = useMembersStore();
 const ui = useUiStore();
+const scope = useScopeStore();
+/** 記在側邊欄目前切換的帳本；建立後不可改到另一本 */
+const ledger = computed(() => scope.current);
 
 const type = ref<TxType>("expense");
 const mainId = ref<number | null>(null);
@@ -69,9 +73,11 @@ async function submit() {
       amount: Number(amount.value),
       date: date.value,
       note: note.value.trim() || undefined,
-      payerId: auth.isAdmin && payerId.value ? payerId.value : undefined,
+      scope: ledger.value,
+      // 個人帳的記帳者恆為自己，不送代記
+      payerId: auth.isAdmin && ledger.value === "family" && payerId.value ? payerId.value : undefined,
     });
-    ui.flash("已記下一筆");
+    ui.flash(ledger.value === "personal" ? "已記在個人帳" : "已記下一筆");
     // 儲存成功後回到交易列表，不停留連續記帳
     await router.push({ name: "transactions" });
   } catch {
@@ -87,7 +93,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
 <template>
   <AppShell
     title="新增交易"
-    :subtitle="auth.isAdmin ? '可代記其他成員的帳' : '記帳者自動帶入登入者'"
+    :subtitle="auth.isAdmin && ledger === 'family' ? '可代記其他成員的帳' : '記帳者自動帶入登入者'"
     back-to="/"
     :loading="cats.initialLoading"
     :error="cats.error"
@@ -118,7 +124,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
               class="flex flex-col items-center gap-1.5 py-3 rounded-lg border cursor-pointer min-h-hit"
               :class="
                 c.id === mainId
-                  ? 'bg-brand-tint border-[rgba(107,92,245,.4)] text-brand-600'
+                  ? 'bg-brand-tint border-[rgba(var(--brand-rgb),.4)] text-brand-600'
                   : 'bg-surface-subtle border text-fg-2'
               "
               @click="pickMain(c.id)"
@@ -153,7 +159,7 @@ onMounted(() => Promise.all([cats.load(), auth.isAdmin ? members.load() : undefi
           />
         </FormField>
 
-        <div v-if="auth.isAdmin" class="flex flex-col gap-[7px]">
+        <div v-if="auth.isAdmin && ledger === 'family'" class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">記帳者</span>
           <SegmentedControl
             :options="members.active.map((m) => ({ value: String(m.id), label: m.name }))"
