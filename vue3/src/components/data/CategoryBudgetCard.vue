@@ -39,8 +39,8 @@ defineProps<{ category: CategoryProgress; hideBudgetLink?: boolean }>();
       <div v-for="tx in category.recent" :key="tx.id" class="flex items-baseline gap-2 text-[12px]">
         <span class="font-mono text-[11px] text-fg-4">{{ shortDate(tx.date) }}</span>
         <span class="text-fg-2 whitespace-nowrap">{{ tx.subCategoryName ?? tx.mainCategoryName }}</span>
-        <span v-if="tx.note" class="text-note text-[11px] truncate min-w-0">{{ tx.note }}</span>
         <span class="text-fg-4 text-[11px] whitespace-nowrap">{{ tx.payerName }}</span>
+        <span v-if="tx.note" class="text-note text-[11px] truncate min-w-0">{{ tx.note }}</span>
         <span class="ml-auto pl-2 text-fg-1 tnum whitespace-nowrap">{{ money(tx.amount) }}</span>
       </div>
       <RouterLink to="/transactions" class="text-[12px] text-brand-500 self-start">查看完整歷史 →</RouterLink>

@@ -27,11 +27,10 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
     <span class="w-[26px] h-[26px] rounded-sm bg-surface-muted border flex items-center justify-center text-fg-3">
       <span class="material-symbols-rounded text-[15px]">{{ tx.type === "income" ? "payments" : "receipt_long" }}</span>
     </span>
-    <span class="flex items-baseline gap-1.5 min-w-0">
-      <span class="text-fg-1 whitespace-nowrap">{{ tx.subCategoryName ?? tx.mainCategoryName ?? "—" }}</span>
-      <span v-if="tx.note" class="text-note text-[11px] truncate">{{ tx.note }}</span>
-    </span>
-    <span v-if="showPayer" class="text-fg-3 text-[12px]">{{ tx.payerName }}</span>
+    <span class="text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName ?? "—" }}</span>
+    <!-- 不顯示記帳者時仍保留這一格，欄位才對得齊 -->
+    <span class="text-fg-3 text-[12px] truncate">{{ showPayer ? tx.payerName : "" }}</span>
+    <span class="text-note text-[11px] truncate">{{ tx.note }}</span>
     <span class="text-right text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
     <span v-if="!readonly" class="flex justify-end gap-0.5">
       <template v-if="canEdit">
