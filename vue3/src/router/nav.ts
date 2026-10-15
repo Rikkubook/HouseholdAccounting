@@ -22,5 +22,6 @@ export const NAV_ITEMS: NavItem[] = [
   { name: "categories", label: "分類設定", to: "/categories", adminOnly: true },
 ];
 
-/** 依目前帳本過濾：個人帳隱藏 familyOnly 的項目。 */
-export const navItemsFor = (personal: boolean) => NAV_ITEMS.filter((i) => !(personal && i.familyOnly));
+/** 依角色與目前帳本過濾：一般成員看不到 ADMIN 區；個人帳隱藏 familyOnly 的項目。 */
+export const navItemsFor = (isAdmin: boolean, personal: boolean) =>
+  NAV_ITEMS.filter((i) => !(i.adminOnly && !isAdmin) && !(personal && i.familyOnly));

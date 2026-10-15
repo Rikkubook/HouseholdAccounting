@@ -23,7 +23,7 @@ const appVersion = __APP_VERSION__;
     <ScopeSwitch class="mx-2.5 -mt-2" />
 
     <div class="flex flex-col gap-0.5">
-      <template v-for="item in navItemsFor(scope.isPersonal)" :key="item.name">
+      <template v-for="item in navItemsFor(auth.isAdmin, scope.isPersonal)" :key="item.name">
         <div
           v-if="item.adminDivider"
           class="mx-5 mt-2 mb-1 font-mono text-[10.5px] tracking-[0.14em] text-fg-4"
