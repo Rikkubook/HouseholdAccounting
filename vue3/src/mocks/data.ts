@@ -99,14 +99,22 @@ export const budgets: Budget[] = [
   { id: 10, month: "2026-08", mainCategoryId: 6, amount: 6000 },
 ];
 
-export const subscriptions: Subscription[] = [
-  { id: 1, name: "影音串流", amount: 390, cycle: "monthly", nextChargeDate: "2026-09-10", mainCategoryId: 9, payerId: 1, isActive: true },
-  { id: 2, name: "音樂訂閱", amount: 180, cycle: "monthly", nextChargeDate: "2026-09-08", mainCategoryId: 9, payerId: 2, isActive: true },
-  { id: 3, name: "雲端空間", amount: 90, cycle: "monthly", nextChargeDate: "2026-09-12", mainCategoryId: 9, payerId: 1, isActive: true },
-  { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 9, payerId: 2, isActive: true },
-  { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 9, payerId: 1, isActive: true },
-  { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 9, payerId: 2, isActive: false },
-];
+/** chargeDay、chargeMonth 由首次扣款日推出，與後端 seed 一致。 */
+export const subscriptions: Subscription[] = (
+  [
+    { id: 1, name: "影音串流", amount: 390, cycle: "monthly", nextChargeDate: "2026-09-10", mainCategoryId: 9, payerId: 1, isActive: true },
+    { id: 2, name: "音樂訂閱", amount: 180, cycle: "monthly", nextChargeDate: "2026-09-08", mainCategoryId: 9, payerId: 2, isActive: true },
+    { id: 3, name: "雲端空間", amount: 90, cycle: "monthly", nextChargeDate: "2026-09-12", mainCategoryId: 9, payerId: 1, isActive: true },
+    { id: 4, name: "健身房會員", amount: 12000, cycle: "yearly", nextChargeDate: "2027-03-01", mainCategoryId: 9, payerId: 2, isActive: true },
+    { id: 5, name: "新聞訂閱", amount: 1800, cycle: "yearly", nextChargeDate: "2026-11-20", mainCategoryId: 9, payerId: 1, isActive: true },
+    { id: 6, name: "遊戲通行證", amount: 268, cycle: "monthly", nextChargeDate: "2026-09-20", mainCategoryId: 9, payerId: 2, isActive: false },
+  ] satisfies Omit<Subscription, "chargeDay" | "chargeMonth" | "periodAmount">[]
+).map((s) => ({
+  ...s,
+  chargeDay: Number(s.nextChargeDate.slice(8, 10)),
+  chargeMonth: s.cycle === "yearly" ? Number(s.nextChargeDate.slice(5, 7)) : null,
+  periodAmount: null,
+}));
 
 export const yearExtras: YearExtraExpense[] = [
   { id: 1, year: 2026, name: "健檢", amount: 9900, mainCategoryId: 5, payerId: SYSTEM_ID },

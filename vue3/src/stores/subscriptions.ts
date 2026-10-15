@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { computed, ref } from "vue";
 import { subscriptionsApi, type SubscriptionDraft } from "@/api/subscriptions";
 import type { Subscription } from "@/types/models";
-import { monthlyEquivalent, todayISO } from "@/utils/format";
+import { displayChargeDate, monthlyEquivalent, todayISO } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 export const useSubscriptionsStore = defineStore("subscriptions", () => {
@@ -24,11 +24,13 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
     return activeItems.value.filter((s) => s.payerId === payerId).length;
   }
 
+  /** 到期提示看實際扣款日；年繳是下一次年繳日，不是每月的分攤日。 */
   function dueLabel(sub: Subscription): string {
     const today = todayISO();
-    if (sub.nextChargeDate < today) return "已逾期";
-    if (sub.nextChargeDate === today) return "今天";
-    const days = Math.round((Date.parse(sub.nextChargeDate) - Date.parse(today)) / 86400000);
+    const date = displayChargeDate(sub);
+    if (date < today) return "已逾期";
+    if (date === today) return "今天";
+    const days = Math.round((Date.parse(date) - Date.parse(today)) / 86400000);
     return days <= 7 ? days + " 天後" : "";
   }
 
@@ -65,11 +67,5 @@ export const useSubscriptionsStore = defineStore("subscriptions", () => {
     create: async (d: SubscriptionDraft) => upsert(await subscriptionsApi.create(d)),
     update: async (id: number, p: Partial<SubscriptionDraft>) => upsert(await subscriptionsApi.update(id, p)),
     setActive: async (id: number, isActive: boolean) => upsert(await subscriptionsApi.setActive(id, isActive)),
-    /** 依本期扣款日產生交易（金額取設定、記帳者取扣款人），再推算下次扣款日。 */
-    markPaid: async (id: number) => {
-      const { subscription } = await subscriptionsApi.markPaid(id);
-      upsert(subscription);
-      return subscription;
-    },
   };
 });

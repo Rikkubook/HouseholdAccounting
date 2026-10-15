@@ -115,10 +115,16 @@ export interface Subscription {
   name: string;
   amount: number;
   cycle: BillingCycle;
-  /** 下次扣款日 YYYY-MM-DD */
+  /** 下次扣款日 YYYY-MM-DD；年繳是下一期分攤的日期（顯示用 nextAnnualChargeDate） */
   nextChargeDate: string;
+  /** 原本的扣款日（1–31），月底不足時推算的錨點 */
+  chargeDay: number;
+  /** 年繳：實際年繳扣款的月份（1–12）；月繳為 null */
+  chargeMonth: number | null;
+  /** 年繳：本期年費（第 1 期產生時固定）；月繳或尚未開始分攤為 null */
+  periodAmount: number | null;
   mainCategoryId: number;
-  /** 扣款人：標記已扣款時以此人為記帳者 */
+  /** 扣款人：到期自動扣款時以此人為記帳者 */
   payerId: number;
   isActive: boolean;
 }

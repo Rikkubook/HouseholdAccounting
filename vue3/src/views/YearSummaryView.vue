@@ -5,6 +5,7 @@ import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
 import AppBadge from "@/components/base/AppBadge.vue";
 import AppDialog from "@/components/base/AppDialog.vue";
+import DetailTable from "@/components/base/DetailTable.vue";
 import MetricStat from "@/components/base/MetricStat.vue";
 import FormField from "@/components/base/FormField.vue";
 import TextInput from "@/components/base/TextInput.vue";
@@ -43,6 +44,13 @@ const form = ref<ExtraForm | null>(null);
 const yearOptions = computed(() => [thisYear, thisYear - 1, thisYear - 2]);
 const categoryOptions = computed(() => cats.selectable.filter((c) => c.type === "expense"));
 
+/** 每月平均一律 ÷ 12（不看已記錄月份或分類存在月份），見 docs/requirements G-3。 */
+const perMonth = (v: number) => money(v / 12);
+
+/** 全年支出含年度額外開銷，與「結餘」卡片同口徑（G-2）。 */
+const extrasTotal = computed(() => (data.value?.extras ?? []).reduce((s, e) => s + e.amount, 0));
+const annualExpense = computed(() => (data.value ? data.value.expense + extrasTotal.value : null));
+
 /** 底部支出合計列：各月合計、額外開銷合計、全年合計。 */
 const footer = computed(() => {
   const rows = data.value?.rows ?? [];
@@ -63,14 +71,13 @@ const footer = computed(() => {
  */
 const balanceRows = computed(() => {
   const monthly = data.value?.monthly ?? [];
-  const avg = (v: number) => money(v / Math.max(1, data.value?.recordedMonths ?? 1));
   return [
     {
       label: "收入合計",
       months: monthly.map((m) => m?.income ?? null),
       extra: null as number | null,
       total: data.value?.income ?? 0,
-      avg,
+      avg: perMonth,
       signed: false,
     },
     {
@@ -78,7 +85,7 @@ const balanceRows = computed(() => {
       months: monthly.map((m) => m?.net ?? null),
       extra: footer.value.extra ? -footer.value.extra : null,
       total: (data.value?.income ?? 0) - footer.value.total,
-      avg,
+      avg: perMonth,
       signed: true,
     },
   ];
@@ -139,10 +146,26 @@ async function submitExtra() {
   await load();
 }
 
-async function removeExtra(id: number, name: string) {
-  await summaryApi.removeYearExtra(id);
-  ui.flash("已刪除「" + name + "」");
-  await load();
+/** 待確認刪除的年度額外開銷；此表是實體刪除，刪了無法復原，一律先確認。 */
+const confirmingExtra = ref<YearSummaryPayload["extras"][number] | null>(null);
+const removingExtra = ref(false);
+
+function removeExtra(extra: YearSummaryPayload["extras"][number]) {
+  confirmingExtra.value = extra;
+}
+
+async function confirmRemoveExtra() {
+  const extra = confirmingExtra.value;
+  if (!extra || removingExtra.value) return;
+  removingExtra.value = true;
+  try {
+    await summaryApi.removeYearExtra(extra.id);
+    ui.flash("已刪除「" + extra.name + "」");
+    confirmingExtra.value = null;
+    await load();
+  } finally {
+    removingExtra.value = false;
+  }
 }
 
 const scope = useScopeStore();
@@ -185,7 +208,12 @@ onMounted(async () => {
     <AppCard>
       <div class="grid grid-cols-2 gap-5 md:grid-cols-4">
         <MetricStat label="全年收入" :value="data?.income ?? null" size="md" />
-        <div class="md:pl-5 md:border-l"><MetricStat label="全年支出" :value="data?.expense ?? null" size="md" /></div>
+        <div class="md:pl-5 md:border-l"><MetricStat
+            label="全年支出"
+            :value="annualExpense"
+            size="md"
+            :hint="extrasTotal ? '包含年度額外開銷 ' + money(extrasTotal) : ''"
+          /></div>
         <div class="md:pl-5 md:border-l">
           <MetricStat
             label="結餘"
@@ -199,7 +227,7 @@ onMounted(async () => {
             label="已記錄月份"
             :value="data?.recordedMonths ?? null"
             size="md"
-            :hint="data ? '每月平均 ' + money((data.expense || 0) / (data.recordedMonths || 1)) : ''"
+            :hint="annualExpense !== null ? '每月平均 ' + perMonth(annualExpense) : ''"
           />
         </div>
       </div>
@@ -262,7 +290,7 @@ onMounted(async () => {
             <span class="text-right pr-1 font-bold text-fg-1 tnum">{{ money(row.total) }}</span>
             <span class="text-right pr-1 font-mono tnum text-fg-3">{{ row.planned === null ? "—" : money(row.planned) }}</span>
             <span class="text-right pr-1 font-mono tnum text-fg-3">
-              {{ money(row.total / Math.max(1, Math.min(row.endMonth, 12) - row.startMonth)) }}
+              {{ perMonth(row.total) }}
             </span>
             <span class="flex flex-col items-end gap-1 pr-4">
               <span class="font-mono text-[11px] text-fg-3">
@@ -295,7 +323,7 @@ onMounted(async () => {
             <span class="text-right pr-1 font-bold text-fg-1 tnum">{{ money(footer.total) }}</span>
             <span class="text-right pr-1 font-mono tnum text-fg-3">{{ money(footer.planned) }}</span>
             <span class="text-right pr-1 font-mono tnum text-fg-3">
-              {{ money(footer.total / Math.max(1, data?.recordedMonths ?? 1)) }}
+              {{ perMonth(footer.total) }}
             </span>
             <span class="text-right pr-4 font-mono text-[11px] text-fg-3">100.0%</span>
           </div>
@@ -398,7 +426,7 @@ onMounted(async () => {
         <span class="text-fg-3">{{ e.payerName }}</span>
         <span class="text-right text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
         <span class="flex justify-end">
-          <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e.id, e.name)" />
+          <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e)" />
         </span>
       </div>
     </AppCard>
@@ -432,6 +460,29 @@ onMounted(async () => {
       <template #footer>
         <AppButton variant="primary" size="lg" full-width @click="submitExtra">新增</AppButton>
         <AppButton size="lg" @click="form = null">取消</AppButton>
+      </template>
+    </AppDialog>
+
+    <AppDialog
+      :open="!!confirmingExtra"
+      title="確定要刪除這筆年度額外開銷？"
+      subtitle="刪除後無法復原"
+      @close="confirmingExtra = null"
+    >
+      <DetailTable
+        v-if="confirmingExtra"
+        :columns="[
+          { label: '項目', value: confirmingExtra.name, width: 'minmax(0,1fr)' },
+          { label: '分類', value: confirmingExtra.categoryName },
+          { label: '記帳者', value: confirmingExtra.payerName },
+          { label: '金額', value: money(confirmingExtra.amount), align: 'right', emphasis: true },
+        ]"
+      />
+      <template #footer>
+        <AppButton variant="primary" size="lg" full-width :disabled="removingExtra" @click="confirmRemoveExtra">
+          刪除
+        </AppButton>
+        <AppButton size="lg" @click="confirmingExtra = null">取消</AppButton>
       </template>
     </AppDialog>
 
