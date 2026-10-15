@@ -17,7 +17,7 @@ import { useMembersStore } from "@/stores/members";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
-import { money, shortDate, todayISO } from "@/utils/format";
+import { INSTALLMENTS, displayChargeDate, installmentsPaid, todayISO } from "@/utils/format";
 import type { BillingCycle, Subscription } from "@/types/models";
 
 const cats = useCategoriesStore();
@@ -32,6 +32,8 @@ interface Form {
   cycle: BillingCycle;
   nextChargeDate: string;
   payerId: number;
+  /** 年繳分攤進行中：週期與扣款日鎖住，顯示這段說明（G-6） */
+  lockedNote?: string;
 }
 const form = ref<Form | null>(null);
 
@@ -46,13 +48,18 @@ function openNew() {
 }
 
 function openEdit(sub: Subscription) {
+  const paid = installmentsPaid(sub);
   form.value = {
     id: sub.id,
     name: sub.name,
     amount: String(sub.amount),
     cycle: sub.cycle,
-    nextChargeDate: sub.nextChargeDate,
+    // 年繳顯示實際年繳日；分攤中鎖住不送出，不會誤改到每月的分攤日
+    nextChargeDate: displayChargeDate(sub),
     payerId: sub.payerId,
+    lockedNote: paid
+      ? "本期已分攤 " + paid + "/" + INSTALLMENTS + "，週期與扣款日要等本期結束才能改；改金額從下一期起生效"
+      : undefined,
   };
 }
 
@@ -69,29 +76,18 @@ async function submit() {
     payerId: v.payerId,
   };
   if (v.id) {
-    await store.update(v.id, payload);
+    if (v.lockedNote) {
+      const { cycle: _cycle, nextChargeDate: _date, ...rest } = payload;
+      await store.update(v.id, rest);
+    } else {
+      await store.update(v.id, payload);
+    }
     ui.flash("已更新「" + payload.name + "」，金額變更已存入歷史版本");
   } else {
     await store.create(payload);
     ui.flash("已新增訂閱「" + payload.name + "」");
   }
   form.value = null;
-}
-
-/** 標記已扣款：以本期扣款日產生交易（金額取設定、記帳者取扣款人）。 */
-async function markPaid(sub: Subscription) {
-  const paidOn = shortDate(sub.nextChargeDate);
-  const next = await store.markPaid(sub.id);
-  ui.flash(
-    "已於 " +
-      paidOn +
-      " 產生交易 " +
-      money(sub.amount) +
-      "（" +
-      members.nameOf(sub.payerId) +
-      "），下次扣款 " +
-      shortDate(next.nextChargeDate)
-  );
 }
 
 async function toggle(sub: Subscription, isActive: boolean) {
@@ -142,7 +138,7 @@ onMounted(async () => {
     <AppCard pad="none">
       <div
         class="hidden md:grid px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4"
-        :style="{ gridTemplateColumns: '34px minmax(88px,1fr) 84px 64px 60px 104px 92px 76px' }"
+        :style="{ gridTemplateColumns: '34px minmax(88px,1fr) 84px 64px 60px 104px 92px 44px' }"
       >
         <span></span><span>名稱</span><span class="text-right">金額</span><span>週期</span>
         <span>扣款人</span><span>下次扣款日</span><span>狀態</span><span></span>
@@ -156,7 +152,6 @@ onMounted(async () => {
         :payer-name="members.nameOf(sub.payerId)"
         :due-label="store.dueLabel(sub)"
         @edit="openEdit"
-        @mark-paid="markPaid"
         @toggle="toggle"
       />
 
@@ -178,6 +173,7 @@ onMounted(async () => {
         <div class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">週期</span>
           <SegmentedControl
+            v-if="!form.lockedNote"
             :options="[
               { value: 'monthly', label: '每月' },
               { value: 'yearly', label: '每年' },
@@ -185,6 +181,10 @@ onMounted(async () => {
             :model-value="form.cycle"
             @update:model-value="form.cycle = $event as BillingCycle"
           />
+          <span v-else class="text-[14px] text-fg-1">每年</span>
+          <span v-if="form.cycle === 'yearly'" class="text-[10.5px] text-fg-4">
+            年費自扣款月起拆成 {{ INSTALLMENTS }} 期，每月產生一筆分攤交易
+          </span>
         </div>
 
         <div class="flex flex-col gap-[7px]">
@@ -194,14 +194,15 @@ onMounted(async () => {
             :model-value="String(form.payerId)"
             @update:model-value="form.payerId = Number($event)"
           />
-          <span class="text-[10.5px] text-fg-4">標記已扣款時會以此人為記帳者產生交易</span>
+          <span class="text-[10.5px] text-fg-4">到期自動扣款時，以此人為記帳者產生交易</span>
         </div>
 
-        <FormField label="下次扣款日">
+        <FormField :label="form.cycle === 'yearly' ? '下次年繳日' : '下次扣款日'" :readonly-note="form.lockedNote">
           <input
             v-model="form.nextChargeDate"
             type="date"
-            class="h-[46px] px-3 rounded-lg border border-strong bg-surface text-[14px] text-fg-1 outline-none box-border w-full"
+            :disabled="!!form.lockedNote"
+            class="h-[46px] px-3 rounded-lg border border-strong bg-surface text-[14px] text-fg-1 outline-none box-border w-full disabled:bg-surface-muted disabled:text-fg-3"
           />
         </FormField>
 

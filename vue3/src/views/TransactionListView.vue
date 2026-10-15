@@ -5,6 +5,7 @@ import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
 import AppDialog from "@/components/base/AppDialog.vue";
 import AppPagination from "@/components/base/AppPagination.vue";
+import DetailTable from "@/components/base/DetailTable.vue";
 import EmptyState from "@/components/base/EmptyState.vue";
 import FormField from "@/components/base/FormField.vue";
 import TextInput from "@/components/base/TextInput.vue";
@@ -22,7 +23,7 @@ import { useTransactionsStore } from "@/stores/transactions";
 import { useUiStore } from "@/stores/ui";
 import { normalizeError } from "@/api/client";
 import { RouterLink } from "vue-router";
-import { currentMonth } from "@/utils/format";
+import { currentMonth, money } from "@/utils/format";
 import type { TransactionView } from "@/types/models";
 
 const auth = useAuthStore();
@@ -131,12 +132,39 @@ async function saveEdit() {
   editing.value = null;
 }
 
-async function removeTx(tx: TransactionView) {
-  await store.remove(tx.id);
-  // 軟刪除，前台不提供復原
-  ui.flash("已刪除這筆交易");
-  editing.value = null;
+/** 待確認刪除的交易；刪除前一律先跳確認（前台沒有復原入口）。 */
+const confirmingRemove = ref<TransactionView | null>(null);
+const removing = ref(false);
+
+function removeTx(tx: TransactionView) {
+  confirmingRemove.value = tx;
 }
+
+async function confirmRemove() {
+  const tx = confirmingRemove.value;
+  if (!tx || removing.value) return;
+  removing.value = true;
+  try {
+    await store.remove(tx.id);
+    // 軟刪除，前台不提供復原
+    ui.flash("已刪除這筆交易");
+    confirmingRemove.value = null;
+    editing.value = null;
+  } finally {
+    removing.value = false;
+  }
+}
+
+const removeColumns = computed(() => {
+  const tx = confirmingRemove.value;
+  if (!tx) return [];
+  return [
+    { label: "日期", value: tx.date.replaceAll("-", "/"), width: "auto" },
+    { label: "子項目", value: tx.subCategoryName ?? tx.mainCategoryName, note: tx.note, width: "minmax(0,1fr)" },
+    { label: "記帳者", value: tx.payerName, width: "auto" },
+    { label: "金額", value: money(tx.amount), align: "right" as const, emphasis: true, width: "auto" },
+  ];
+});
 
 onMounted(async () => {
   await Promise.all([cats.load(), members.load()]);
@@ -318,6 +346,19 @@ onMounted(async () => {
         >
           刪除
         </AppButton>
+      </template>
+    </AppDialog>
+
+    <AppDialog
+      :open="!!confirmingRemove"
+      title="確定要刪除這筆交易？"
+      subtitle="刪除後無法在畫面上復原"
+      @close="confirmingRemove = null"
+    >
+      <DetailTable :columns="removeColumns" />
+      <template #footer>
+        <AppButton variant="primary" size="lg" full-width :disabled="removing" @click="confirmRemove">刪除</AppButton>
+        <AppButton size="lg" @click="confirmingRemove = null">取消</AppButton>
       </template>
     </AppDialog>
 

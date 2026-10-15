@@ -3,21 +3,29 @@
 export const monthOf = (date: string): string => date.slice(0, 7);
 export const yearOf = (value: string): number => Number(value.slice(0, 4));
 
-/** 今天（YYYY-MM-DD，以伺服器時區為準）。 */
+/**
+ * 「今天」一律以台灣時間判斷，不看伺服器時區：Vercel 跑在 UTC，
+ * 台灣凌晨 0～8 點會被當成前一天，訂閱扣款就會晚一天產生。
+ * 前端 vue3/src/utils/format.ts 的 todayISO 同樣以台灣時間判斷。
+ */
+export const APP_TIME_ZONE = "Asia/Taipei";
+
+/** en-CA 的日期格式剛好是 YYYY-MM-DD */
+const dateInAppZone = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** 今天（YYYY-MM-DD，台灣時間）。 */
 export function today(): string {
-  const now = new Date();
-  return (
-    now.getFullYear() +
-    "-" +
-    String(now.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(now.getDate()).padStart(2, "0")
-  );
+  return dateInAppZone.format(new Date());
 }
 
+/** 本月（YYYY-MM，台灣時間）。 */
 export function currentMonth(): string {
-  const now = new Date();
-  return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0");
+  return today().slice(0, 7);
 }
 
 export function addMonths(month: string, delta: number): string {
@@ -64,6 +72,33 @@ export function advanceChargeDate(
     "-" +
     String(Math.min(day, lastDay)).padStart(2, "0")
   );
+}
+
+/**
+ * 年繳分攤（docs/requirements G-6）：年費拆成 12 期，自扣款月起每月一期。
+ * 第幾期由「分攤日所在月份」與「年繳扣款月」的差推算，0 = 第 1 期（實際年繳扣款那個月）。
+ * 前端 vue3/src/utils/format.ts 有同一份實作，兩邊要一起改。
+ */
+export const INSTALLMENTS = 12;
+
+export function installmentIndex(chargeDate: string, chargeMonth: number): number {
+  return (Number(chargeDate.slice(5, 7)) - chargeMonth + 12) % 12;
+}
+
+/** 每期 = 年費 ÷ 12 取整數，除不盡的差額放在最後一期，12 期合計等於年費。 */
+export function installmentAmount(periodAmount: number, index: number): number {
+  const base = Math.floor(periodAmount / INSTALLMENTS);
+  return index === INSTALLMENTS - 1 ? periodAmount - base * (INSTALLMENTS - 1) : base;
+}
+
+/** 下一次實際年繳扣款日：還沒開始本期分攤時就是 nextChargeDate，否則是本期結束後的扣款月。 */
+export function nextAnnualChargeDate(nextChargeDate: string, chargeMonth: number, chargeDay: number): string {
+  if (installmentIndex(nextChargeDate, chargeMonth) === 0) return nextChargeDate;
+  const y = Number(nextChargeDate.slice(0, 4));
+  const m = Number(nextChargeDate.slice(5, 7));
+  const targetY = m > chargeMonth ? y + 1 : y;
+  const lastDay = new Date(Date.UTC(targetY, chargeMonth, 0)).getUTCDate();
+  return targetY + "-" + String(chargeMonth).padStart(2, "0") + "-" + String(Math.min(chargeDay, lastDay)).padStart(2, "0");
 }
 
 /** 年繳換算為月攤提，四捨五入到元。 */
