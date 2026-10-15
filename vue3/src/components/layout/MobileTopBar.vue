@@ -33,11 +33,12 @@ function go(to: string) {
         <span class="material-symbols-rounded text-[22px]">menu</span>
       </button>
       <div class="text-[14.5px] font-bold text-fg-1">{{ title }}</div>
+      <!-- 目前的帳本；只有管理者能切換，一般成員只有家庭帳就不顯示 -->
       <span
-        v-if="scope.isPersonal"
+        v-if="scope.canUsePersonal"
         class="ml-auto px-2.5 py-1 rounded-pill bg-brand-tint text-brand-600 text-[11.5px]"
       >
-        個人帳
+        {{ scope.isPersonal ? "個人帳" : "家庭帳" }}
       </span>
     </div>
 
