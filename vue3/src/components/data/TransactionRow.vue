@@ -20,7 +20,7 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
 <template>
   <!-- 桌機：多欄表格列 -->
   <div
-    class="hidden md:grid items-center gap-3 px-5 py-[11px] border-b border-[rgba(0,0,0,.04)] text-[12.5px] hover:bg-surface-subtle"
+    class="hidden md:grid items-center gap-2 px-5 py-[11px] border-b border-[rgba(0,0,0,.04)] text-[12.5px] hover:bg-surface-subtle"
     :style="{ gridTemplateColumns: txGridColumns(readonly) }"
   >
     <span class="font-mono text-[11.5px] text-fg-4">{{ shortDate(tx.date) }}</span>
@@ -44,11 +44,12 @@ defineEmits<{ edit: [TransactionView]; remove: [TransactionView] }>();
   <div class="md:hidden flex items-center gap-2.5 px-4 py-3 border-b border-[rgba(0,0,0,.04)]">
     <span class="flex flex-col gap-0.5 min-w-0" @click="canEdit && $emit('edit', tx)">
       <span class="text-body text-fg-1 truncate">{{ tx.subCategoryName ?? tx.mainCategoryName ?? "—" }}</span>
-      <span class="text-[10.5px] text-fg-4">
-        {{ [tx.mainCategoryName, tx.payerName, tx.note].filter(Boolean).join(" · ") }}
+      <span class="text-[10.5px] text-fg-4 truncate">
+        {{ [tx.mainCategoryName, tx.payerName].filter(Boolean).join(" · ")
+        }}<template v-if="tx.note"> · <span class="text-note">{{ tx.note }}</span></template>
       </span>
     </span>
-    <span class="ml-auto text-body text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
-    <IconButton v-if="canEdit && !readonly" icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
+    <span class="ml-auto shrink-0 text-body text-fg-1 font-medium tnum">{{ money(tx.amount) }}</span>
+    <IconButton v-if="canEdit && !readonly" class="shrink-0" icon="edit" label="編輯這筆" :size="40" @click="$emit('edit', tx)" />
   </div>
 </template>

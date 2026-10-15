@@ -96,7 +96,7 @@ watch(() => scope.current, () => store.load());
       </div>
       <!-- 與交易列表同一個列元件與欄寬；首頁只看不改，不留操作欄 -->
       <div
-        class="hidden md:grid gap-3 px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4"
+        class="hidden md:grid gap-2 px-5 py-2.5 border-b text-[11px] tracking-[0.04em] text-fg-4 whitespace-nowrap"
         :style="{ gridTemplateColumns: txGridColumns(true) }"
       >
         <span>日期</span><span></span><span>子項目</span><span>記帳者</span><span>備註</span>
