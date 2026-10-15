@@ -4,11 +4,15 @@ import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import ProgressBar from "@/components/base/ProgressBar.vue";
 import { summaryApi, type StatsPayload } from "@/api/summary";
+import { useAuthStore } from "@/stores/auth";
 import { useMembersStore } from "@/stores/members";
+import { useScopeStore } from "@/stores/scope";
 import { currentMonth, money, percent } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
+const auth = useAuthStore();
 const members = useMembersStore();
+const scope = useScopeStore();
 
 const month = ref(currentMonth());
 const data = ref<StatsPayload | null>(null);
@@ -62,12 +66,19 @@ async function load() {
   error.value = null;
   openCategoryId.value = null; // 切換月份時退回主分類層
   try {
-    const [all, ...perMember] = await Promise.all([
-      summaryApi.stats("month", month.value),
-      ...members.active.map((m) => summaryApi.stats("month", month.value, m.id)),
-    ]);
-    data.value = all;
-    memberTotals.value = perMember.map((p) => p.total);
+    if (scope.isPersonal) {
+      // 個人帳只有自己的支出，不必逐一查各成員
+      const all = await summaryApi.stats("month", month.value);
+      data.value = all;
+      memberTotals.value = members.active.map((m) => (m.id === auth.user?.id ? all.total : 0));
+    } else {
+      const [all, ...perMember] = await Promise.all([
+        summaryApi.stats("month", month.value),
+        ...members.active.map((m) => summaryApi.stats("month", month.value, m.id)),
+      ]);
+      data.value = all;
+      memberTotals.value = perMember.map((p) => p.total);
+    }
   } catch (e) {
     error.value = toLoadErrorKind(e);
   } finally {
@@ -77,6 +88,8 @@ async function load() {
 }
 
 watch(month, load);
+// 切換帳本後重新查詢
+watch(() => scope.current, load);
 onMounted(async () => {
   await members.load();
   await load();

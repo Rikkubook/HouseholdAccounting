@@ -19,6 +19,7 @@ const tx = (id: number, sub: string, payer: string, amount: number, date: string
   isDeleted: false,
   sourceSubscriptionId: null,
   createdBy: 1,
+  ownerId: null,
   mainCategoryName: "食",
   subCategoryName: sub,
   payerName: payer,

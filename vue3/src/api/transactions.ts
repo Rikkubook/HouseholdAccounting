@@ -1,4 +1,5 @@
 import { http } from "./client";
+import { activeScope } from "@/stores/scope";
 import type { TransactionDraft, TransactionPatch, TransactionRevision, TransactionView } from "@/types/models";
 
 export interface TransactionQuery {
@@ -20,11 +21,11 @@ export interface Paged<T> {
 
 export const transactionsApi = {
   list: (query: TransactionQuery) =>
-    http.get<Paged<TransactionView>>("/transactions", { params: query }).then((r) => r.data),
+    http.get<Paged<TransactionView>>("/transactions", { params: { ...query, scope: activeScope() } }).then((r) => r.data),
 
   /** 省略 payerId＝登入者本人；管理者可指定他人（代記）。 */
   create: (draft: TransactionDraft) =>
-    http.post<TransactionView>("/transactions", draft).then((r) => r.data),
+    http.post<TransactionView>("/transactions", { scope: activeScope(), ...draft }).then((r) => r.data),
 
   /** 收支別不可修改；記帳者僅管理者可改。每次修改寫入 revision。 */
   update: (id: number, patch: TransactionPatch) =>

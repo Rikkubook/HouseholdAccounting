@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
 import { computed, onMounted, ref } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
@@ -90,6 +91,7 @@ onMounted(async () => {
     :error="budgets.error"
     @retry="budgets.load()"
   >
+    <FamilyOnlyNotice feature="預算" />
     <template #actions>
       <MonthStepper :model-value="budgets.month" @update:model-value="load" />
       <AppButton icon="content_copy" @click="copyPrevious">沿用上月</AppButton>

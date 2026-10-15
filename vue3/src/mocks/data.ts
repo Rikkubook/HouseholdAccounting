@@ -152,6 +152,7 @@ function seedTransactions(): Transaction[] {
         createdAt: date + "T00:00:00Z",
         isDeleted: false,
         sourceSubscriptionId: null,
+        ownerId: null,
       });
     });
   }

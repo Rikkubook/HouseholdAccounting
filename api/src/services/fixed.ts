@@ -3,7 +3,7 @@ import type { BillingCycle } from "@family-ledger/shared";
 import { db } from "../db/index.js";
 import { subscriptionRevisions, subscriptions } from "../db/schema.js";
 import { monthOf, monthlyEquivalent } from "../lib/dates.js";
-import { subscriptionScope } from "./scope.js";
+import { FAMILY, subscriptionScope, type Scope } from "./scope.js";
 
 export interface EffectiveSubscription {
   id: number;
@@ -26,7 +26,7 @@ export interface EffectiveSubscription {
  * next_charge_date 在停用當下即凍結，恰好就是已繳費期間的終點——
  * 2028-03 扣了一年年費，next_charge_date = 2029-03，則 6 月停用後仍攤提到 2029-02。
  */
-export async function effectiveSubscriptions(month: string): Promise<EffectiveSubscription[]> {
+export async function effectiveSubscriptions(month: string, scope: Scope = FAMILY): Promise<EffectiveSubscription[]> {
   const rows = await db
     .select({
       id: subscriptions.id,
@@ -49,7 +49,7 @@ export async function effectiveSubscriptions(month: string): Promise<EffectiveSu
     )
     .where(
       and(
-        subscriptionScope(),
+        subscriptionScope(scope),
         or(
           eq(subscriptions.isActive, true),
           // 已停用：仍在已繳費期間內的月份繼續攤提
@@ -77,8 +77,8 @@ export async function effectiveSubscriptions(month: string): Promise<EffectiveSu
 }
 
 /** 固定支出總額：訂閱月換算後加總（年繳 ÷12），含停用後尚在已繳期間的項目。 */
-export async function fixedTotal(month: string): Promise<number> {
-  const list = await effectiveSubscriptions(month);
+export async function fixedTotal(month: string, scope: Scope = FAMILY): Promise<number> {
+  const list = await effectiveSubscriptions(month, scope);
   return list.reduce((sum, s) => sum + s.monthly, 0);
 }
 

@@ -27,6 +27,7 @@ const viewColumns = {
   isDeleted: transactions.isDeleted,
   sourceSubscriptionId: transactions.sourceSubscriptionId,
   createdBy: transactions.createdBy,
+  ownerId: transactions.ownerId,
   mainCategoryName: transactions.mainCategoryName,
   subCategoryName: transactions.subCategoryName,
   payerName: members.name,
