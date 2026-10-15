@@ -17,7 +17,7 @@ function readStored(userId: number | undefined): ScopeName {
 }
 
 /**
- * 家庭帳／個人帳切換。個人帳只有管理者能用：一般成員（含被降級的管理者）一律是家庭帳。
+ * 家庭帳／個人帳切換。每位成員（含一般成員）都有自己的個人帳，只看得到自己的。
  * 選擇依帳號記在這台裝置上，下次打開沿用。
  */
 export const useScopeStore = defineStore("scope", () => {
@@ -31,8 +31,7 @@ export const useScopeStore = defineStore("scope", () => {
     }
   );
 
-  const canUsePersonal = computed(() => auth.isAdmin);
-  const current = computed<ScopeName>(() => (canUsePersonal.value ? selected.value : "family"));
+  const current = computed<ScopeName>(() => selected.value);
   const isPersonal = computed(() => current.value === "personal");
 
   // 讓 tokens.css 依帳本換品牌色
@@ -55,7 +54,7 @@ export const useScopeStore = defineStore("scope", () => {
     }
   }
 
-  return { current, isPersonal, canUsePersonal, set };
+  return { current, isPersonal, set };
 });
 
 /** 給 api/ 模組用：目前的帳本範圍（pinia 掛上後才可呼叫）。 */

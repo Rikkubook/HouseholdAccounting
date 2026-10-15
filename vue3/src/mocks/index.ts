@@ -42,15 +42,10 @@ const live = () => db.transactions.filter((t) => !t.isDeleted);
 /** 與後端一致：依日期、再依 id 由新到舊 */
 const byDateDesc = (a: Transaction, b: Transaction) => b.date.localeCompare(a.date) || b.id - a.id;
 
-/** 與後端 services/scope.ts 相同：家庭帳看 ownerId 為 null；個人帳只限管理者、只看自己的 */
+/** 與後端 services/scope.ts 相同：家庭帳看 ownerId 為 null；個人帳每人都有、只看自己的 */
 function scopedLive(scope?: string) {
   if (scope !== "personal") return live().filter((t) => t.ownerId == null);
-  assertCanUsePersonal();
   return live().filter((t) => t.ownerId === currentUserId);
-}
-function assertCanUsePersonal() {
-  const me = db.members.find((m) => m.id === currentUserId);
-  if (me?.role !== "admin") throw { code: "forbidden", message: "個人帳僅限管理者使用" };
 }
 /** 別人的個人帳一律當作不存在 */
 function findVisible(id: number) {
@@ -181,7 +176,6 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/transactions$/, "post", (_m, body) => {
     // 記帳者省略＝登入者；管理者可代記他人，輸入者一律是登入者
-    if (body.scope === "personal") assertCanUsePersonal();
     const payerId = body.payerId ?? currentUserId;
     if (payerId !== currentUserId) {
       // 與後端一致：個人帳的 owner 必須等於記帳者，不能替別人記到自己的個人帳

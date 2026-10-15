@@ -3,7 +3,7 @@ import { useRoute, useRouter } from "vue-router";
 import { NAV_ITEMS } from "@/router/nav";
 import { useScopeStore, type ScopeName } from "@/stores/scope";
 
-/** 家庭帳／個人帳切換，只有管理者看得到（個人帳僅限管理者）。選中的一格白底、用目前帳本的品牌色。 */
+/** 家庭帳／個人帳切換，所有成員都有。選中的一格白底、用目前帳本的品牌色。 */
 const scope = useScopeStore();
 const route = useRoute();
 const router = useRouter();
@@ -22,7 +22,6 @@ const OPTIONS: { value: ScopeName; label: string; icon: string }[] = [
 
 <template>
   <div
-    v-if="scope.canUsePersonal"
     class="grid grid-cols-2 gap-1 bg-canvas border rounded-lg p-1"
     role="group"
     aria-label="帳本"

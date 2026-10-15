@@ -5,9 +5,9 @@ import { api, freezeToday, reseed } from "./helpers.js";
 
 /**
  * 個人帳第 1 批：個人交易。
- * - 只有管理者能用個人帳，而且只看得到自己的。
- * - 個人交易不算進家庭帳；別人的個人交易當作不存在（404），另一位管理者也一樣。
- * - 角色以當下為準：被降級的管理者看不到自己的個人帳，改回管理者就重新出現。
+ * - 每位成員（含一般成員）都有自己的個人帳，而且只看得到自己的。
+ * - 個人交易不算進家庭帳；別人的個人交易當作不存在（404），管理者也一樣。
+ * - 個人帳與角色無關：改角色不影響看得到自己的個人帳。
  */
 const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
 
@@ -63,15 +63,22 @@ describe("記個人帳", () => {
     await api(`/transactions/${res.body.id}`, { method: "DELETE", as: "mom" });
   });
 
-  it("一般成員不能記個人帳，也不能查", async () => {
-    const create = await api("/transactions", {
+  it("一般成員也有自己的個人帳；管理者看不到、改不了", async () => {
+    const create = await api<TransactionView>("/transactions", {
       method: "POST",
       as: "sis",
       body: { type: "expense", mainCategoryId: 1, subCategoryId: null, amount: 100, date: "2026-09-02", scope: "personal" },
     });
-    expect(create.status).toBe(403);
-    expect((await api("/transactions?scope=personal", { as: "sis" })).status).toBe(403);
-    expect((await api("/summary/dashboard?month=2026-09&scope=personal", { as: "sis" })).status).toBe(403);
+    expect(create.status).toBe(201);
+    expect(create.body).toMatchObject({ ownerId: 3, payerId: 3 });
+
+    const mine = await api<Paged>("/transactions?month=2026-09&scope=personal", { as: "sis" });
+    expect(mine.body.items.map((t) => t.id)).toEqual([create.body.id]);
+
+    const dads = await api<Paged>("/transactions?month=2026-09&scope=personal");
+    expect(dads.body.items.map((t) => t.id)).not.toContain(create.body.id);
+    expect((await api(`/transactions/${create.body.id}`, { method: "PATCH", body: { amount: 1 } })).status).toBe(404);
+    expect((await api(`/transactions/${create.body.id}`, { method: "DELETE" })).status).toBe(404);
   });
 
   it("個人帳不能代記他人，個人交易也不能更換記帳者", async () => {
@@ -150,14 +157,14 @@ describe("別人的個人交易當作不存在", () => {
   });
 });
 
-describe("角色以當下為準", () => {
-  it("被降級成一般成員就看不到自己的個人帳，改回管理者後重新出現", async () => {
+describe("個人帳與角色無關", () => {
+  it("被改成一般成員仍看得到自己的個人帳", async () => {
     await sql`update members set role = 'member' where id = 1`;
-    expect((await api("/transactions?scope=personal")).status).toBe(403);
-    expect((await api(`/transactions/${dadLunch.id}`, { method: "PATCH", body: { amount: 1 } })).status).toBe(404);
-
-    await sql`update members set role = 'admin' where id = 1`;
-    const { body } = await api<Paged>("/transactions?month=2026-09&scope=personal");
-    expect(body.items.map((t) => t.id)).toContain(dadLunch.id);
+    try {
+      const { body } = await api<Paged>("/transactions?month=2026-09&scope=personal");
+      expect(body.items.map((t) => t.id)).toContain(dadLunch.id);
+    } finally {
+      await sql`update members set role = 'admin' where id = 1`;
+    }
   });
 });

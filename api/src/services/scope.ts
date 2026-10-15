@@ -1,6 +1,5 @@
 import { eq, inArray, isNull } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { forbidden } from "../lib/errors.js";
 import type { AuthUser } from "../middleware/auth.js";
 import { budgets, mainCategories, subscriptions, transactions, yearExtraExpenses } from "../db/schema.js";
 
@@ -16,18 +15,17 @@ export type Scope = { kind: "family" } | { kind: "personal"; ownerId: number };
 export const FAMILY: Scope = { kind: "family" };
 
 /**
- * 把請求的 scope 轉成實際範圍。個人帳只有管理者能用，而且永遠是登入者自己的；
- * 角色以每次請求當下為準（requireAuth 從資料庫讀），被降級的管理者立刻看不到自己的個人帳。
+ * 把請求的 scope 轉成實際範圍。每位成員（含一般成員）都有自己的個人帳，
+ * 而且永遠是登入者自己的；沒有任何角色能看別人的個人帳。
  */
 export function resolveScope(user: AuthUser, requested: "family" | "personal" = "family"): Scope {
   if (requested === "family") return FAMILY;
-  if (user.role !== "admin") throw forbidden("個人帳僅限管理者使用");
   return { kind: "personal", ownerId: user.id };
 }
 
-/** 單筆交易對這位使用者是否存在：個人帳只有本人、且目前仍是管理者時看得到 */
+/** 單筆交易對這位使用者是否存在：個人帳只有本人看得到，管理者也看不到別人的 */
 export const canSeeTransaction = (user: AuthUser, tx: { ownerId: number | null }) =>
-  tx.ownerId == null || (tx.ownerId === user.id && user.role === "admin");
+  tx.ownerId == null || tx.ownerId === user.id;
 
 /** 交易：直接看 transactions.owner_id */
 export const txScope = (scope: Scope = FAMILY) =>
