@@ -47,7 +47,7 @@ function go(to: string) {
         <div class="absolute left-0 top-0 bottom-0 w-[268px] bg-surface flex flex-col py-5" @click.stop>
           <div class="flex items-center gap-2.5 px-5 pb-4 border-b">
             <div class="w-[30px] h-[30px] rounded-md bg-brand" />
-            <div class="font-bold text-[15px] text-fg-1">家庭帳</div>
+            <div class="font-bold text-[15px] text-fg-1">{{ scope.isPersonal ? "個人帳" : "家庭帳" }}</div>
           </div>
           <ScopeSwitch class="mx-2.5 mt-3" />
           <div class="flex flex-col gap-0.5 py-3 overflow-auto">

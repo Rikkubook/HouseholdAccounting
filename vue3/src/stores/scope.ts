@@ -52,8 +52,3 @@ export const useScopeStore = defineStore("scope", () => {
 
 /** 給 api/ 模組用：目前的帳本範圍（pinia 掛上後才可呼叫）。 */
 export const activeScope = (): ScopeName => useScopeStore().current;
-
-export const SCOPE_OPTIONS = [
-  { value: "family", label: "家庭" },
-  { value: "personal", label: "個人" },
-];
