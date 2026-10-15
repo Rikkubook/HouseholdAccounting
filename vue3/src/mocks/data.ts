@@ -214,6 +214,17 @@ categories.push({
 } as MainCategory);
 
 /** 試算表「額外開銷」欄：個人年度額外開銷，不分攤到單月 */
+/** 個人預算（PL2-03），與 import-personal-2026.ts 相同：2026 年 10 月起 */
+const PERSONAL_BUDGETS: [cat: string, amount: number][] = [
+  ["食", 10000], ["衣", 1000], ["住", 1000], ["行", 500], ["健康", 500], ["育", 500], ["樂", 500],
+];
+PERSONAL_BUDGETS.forEach(([cat, amount], i) => {
+  const mainCategoryId = categories.find(
+    (c) => c.name === cat && (c as MainCategory & { ownerId?: number }).ownerId === PERSONAL_OWNER
+  )!.id;
+  budgets.push({ id: 301 + i, month: "2026-10", mainCategoryId, amount });
+});
+
 const PERSONAL_EXTRAS: [cat: string, amount: number][] = [
   ["行", 2153],
   ["健康", 27986],

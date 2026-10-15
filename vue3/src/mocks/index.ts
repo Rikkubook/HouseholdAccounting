@@ -107,6 +107,12 @@ const inYear = (t: Transaction, year: number) => t.date.startsWith(String(year))
 const budgetOf = (month: string, catId: number) =>
   db.budgets.find((b) => b.month === month && b.mainCategoryId === catId)?.amount ?? null;
 
+/** 該帳本的預算：看預算掛的分類屬於哪本帳 */
+function scopedBudgets(scope?: string) {
+  const ids = new Set(scopedCategories(scope).map((c) => c.id));
+  return db.budgets.filter((b) => ids.has(b.mainCategoryId));
+}
+
 function fixedTotalOf(scope?: string): number {
   return scopedSubscriptions(scope)
     .filter((s) => s.isActive)
@@ -285,7 +291,8 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
 
   // ── budgets ───────────────────────────────────────────
-  [/^\/budgets$/, "get", (_m, _b, q) => db.budgets.filter((b) => b.month === q.month)],
+  // 預算屬於哪本帳看它的分類，與後端一致
+  [/^\/budgets$/, "get", (_m, _b, q) => scopedBudgets(q.scope).filter((b) => b.month === q.month)],
   [/^\/budgets$/, "put", (_m, body) => {
     let b = db.budgets.find((x) => x.month === body.month && x.mainCategoryId === body.mainCategoryId);
     if (b) b.amount = body.amount;
@@ -295,18 +302,18 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     }
     return b;
   }],
-  [/^\/budgets\/copy-previous$/, "post", (_m, body) => {
+  [/^\/budgets\/copy-previous$/, "post", (_m, body, q) => {
     const [y, mo] = (body.month as string).split("-").map(Number);
     const prev = new Date(y, mo - 2, 1);
     const prevMonth = prev.getFullYear() + "-" + String(prev.getMonth() + 1).padStart(2, "0");
-    for (const src of db.budgets.filter((b) => b.month === prevMonth)) {
+    for (const src of scopedBudgets(q.scope).filter((b) => b.month === prevMonth)) {
       const exist = db.budgets.find((b) => b.month === body.month && b.mainCategoryId === src.mainCategoryId);
       if (exist) exist.amount = src.amount;
       else db.budgets.push({ id: ++seq, month: body.month, mainCategoryId: src.mainCategoryId, amount: src.amount });
     }
-    return db.budgets.filter((b) => b.month === body.month);
+    return scopedBudgets(q.scope).filter((b) => b.month === body.month);
   }],
-  [/^\/budgets\/fixed-total$/, "get", (_m, _b, q) => ({ month: q.month, amount: fixedTotalOf() })],
+  [/^\/budgets\/fixed-total$/, "get", (_m, _b, q) => ({ month: q.month, amount: fixedTotalOf(q.scope) })],
 
   // ── subscriptions ─────────────────────────────────────
   [/^\/subscriptions$/, "get", (_m, _b, q) => scopedSubscriptions(q.scope)],
@@ -429,7 +436,6 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   // ── summary ───────────────────────────────────────────
   [/^\/summary\/dashboard$/, "get", (_m, _b, q) => {
     const month = q.month as string;
-    const personal = q.scope === "personal";
     const rows = scopedLive(q.scope).filter((t) => inMonth(t, month));
     const income = rows.filter((t) => t.type === "income").reduce((s, t) => s + t.amount, 0);
     const expense = rows.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0);
@@ -449,7 +455,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
         const mine = rows.filter((t) => t.mainCategoryId === c.id);
         return {
           id: c.id, name: c.name, icon: c.icon,
-          budget: personal ? null : budgetOf(month, c.id),
+          budget: budgetOf(month, c.id),
           spent: mine.reduce((s, t) => s + t.amount, 0),
           recent: [...mine].sort(byDateDesc).slice(0, 3).map(view),
         };
@@ -461,7 +467,6 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   [/^\/summary\/stats$/, "get", (_m, _b, q) => {
     const range = (q.range ?? "month") as "month" | "year";
     const period = q.period as string;
-    const personal = q.scope === "personal";
     let rows = scopedLive(q.scope).filter((t) => t.type === "expense");
     rows = range === "month" ? rows.filter((t) => inMonth(t, period)) : rows.filter((t) => inYear(t, Number(period)));
     if (q.payerId) rows = rows.filter((t) => t.payerId === Number(q.payerId));
@@ -471,7 +476,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     const fixed = cats.filter((c) => c.type === "expense" && c.nature === "fixed");
     const build = (c: MainCategory) => {
       const mine = rows.filter((t) => t.mainCategoryId === c.id);
-      const monthBudget = personal ? null : budgetOf(range === "month" ? period : period + "-08", c.id);
+      const monthBudget = budgetOf(range === "month" ? period : period + "-08", c.id);
       return {
         mainCategoryId: c.id, name: c.name, icon: c.icon,
         amount: mine.reduce((s, t) => s + t.amount, 0),
@@ -494,7 +499,6 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/summary\/year$/, "get", (_m, _b, q) => {
     const year = Number(q.year);
-    const personal = q.scope === "personal";
     const rows = scopedLive(q.scope).filter((t) => inYear(t, year));
     // 個人帳尚無預算
     // 年度額外開銷屬於哪本帳看它的分類：家庭分類＝家庭帳，本人的個人分類＝個人帳
@@ -546,7 +550,7 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
         const extra = extrasOfYear
           .filter((e) => e.mainCategoryId === c.id)
           .reduce((s, e) => s + e.amount, 0);
-        const monthlyBudget = personal ? 0 : budgetOf(year + "-08", c.id) ?? 0;
+        const monthlyBudget = budgetOf(year + "-08", c.id) ?? 0;
         const activeMonths = Math.max(0, Math.min(endMonth, 12) - startMonth);
         return {
           mainCategoryId: c.id, name: c.name, icon: c.icon, months,

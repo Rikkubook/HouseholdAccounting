@@ -18,7 +18,7 @@ export const NAV_ITEMS: NavItem[] = [
   { name: "transactions", label: "交易列表", to: "/transactions" },
   { name: "stats", label: "統計圖表", to: "/stats" },
   { name: "year-summary", label: "年度彙整", to: "/year" },
-  { name: "budget", label: "預算管理", to: "/budget", adminDivider: true, adminOnly: true },
+  { name: "budget", label: "預算管理", to: "/budget", adminDivider: true, adminOnly: true, personalOpen: true },
   { name: "subscriptions", label: "訂閱管理", to: "/subscriptions", adminOnly: true, personalOpen: true },
   { name: "members", label: "成員管理", to: "/members", adminOnly: true, familyOnly: true },
   { name: "categories", label: "分類設定", to: "/categories", adminOnly: true, personalOpen: true },

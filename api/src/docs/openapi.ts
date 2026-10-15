@@ -350,7 +350,7 @@ export const openApiDocument = {
       "### 貫穿全站的規則",
       "- **歷史不可改寫**：交易軟刪除且無復原入口；分類與成員只能停用；交易每次編輯寫入 revision。",
       "- **記帳者**預設為登入者；管理者可代記他人（新增時傳 `payerId`）、事後也可更換，對象須為啟用中的成員。訂閱產生的交易與個人帳交易不可更換。實際輸入者記在 `createdBy`。",
-      "- **個人帳**：查詢與新增帶 `scope=personal`。所有成員（含一般成員）都有，只看得到自己的；別人的個人帳交易一律回 404，管理者也一樣。個人帳不可代記、建立後不能搬到家庭帳。分類、訂閱、年度額外開銷分家庭與個人，個人交易只能用自己的個人分類；預算目前只有家庭帳。",
+      "- **個人帳**：查詢與新增帶 `scope=personal`。所有成員（含一般成員）都有，只看得到自己的；別人的個人帳交易一律回 404，管理者也一樣。個人帳不可代記、建立後不能搬到家庭帳。分類、預算、訂閱、年度額外開銷都分家庭與個人（看掛的分類屬於哪本帳），個人交易只能用自己的個人分類。",
       "- **投資**（`type=investment`）：錢離開錢包但仍是自己的，不算支出也不算收入。結餘＝收入 − 支出；剩餘現金＝結餘 − 投資。",
       "- **預算**僅浮動支出可設；固定支出由訂閱月換算（年繳 ÷12）自動推算。",
       "- **認證**：`POST /auth/login` 取得 JWT，後續請求帶 `Authorization: Bearer <token>`。",
@@ -587,14 +587,15 @@ export const openApiDocument = {
       get: {
         tags: ["budgets"],
         summary: "當月預算清單",
-        description: "儀表板的分類進度需要，讀取開放全員。固定支出不在此清單（由訂閱推算）。",
-        parameters: [monthQuery],
+        description: "儀表板的分類進度需要，讀取開放全員。固定支出不在此清單（由訂閱推算）。`scope=personal` 只回自己個人分類的預算。",
+        parameters: [monthQuery, scopeQuery],
         responses: { 200: okJson(arrayOf("Budget")), 401: commonErrors[401] },
       },
       put: {
         tags: ["budgets"],
         summary: "設定預算",
-        description: ADMIN + " 僅浮動支出分類可設。`amount: 0` 表示清除該筆設定。",
+        description:
+          "家庭分類**需管理者權限**；自己的個人分類任何成員都可設（別人的個人分類回 400）。僅浮動支出分類可設。`amount: 0` 表示清除該筆設定。",
         requestBody: { required: true, ...json(ref("BudgetUpsert")) },
         responses: { 200: okJson(ref("Budget")), ...commonErrors },
       },
@@ -603,8 +604,8 @@ export const openApiDocument = {
       get: {
         tags: ["budgets"],
         summary: "固定支出總額",
-        description: "由啟用中的訂閱月換算（年繳 ÷12）自動推算，不可手填。",
-        parameters: [monthQuery],
+        description: "由啟用中的訂閱月換算（年繳 ÷12）自動推算，不可手填。`scope=personal` 算自己的個人訂閱。",
+        parameters: [monthQuery, scopeQuery],
         responses: { 200: okJson(ref("FixedTotal")), 401: commonErrors[401] },
       },
     },
@@ -613,8 +614,9 @@ export const openApiDocument = {
         tags: ["budgets"],
         summary: "沿用上月預算",
         description:
-          ADMIN +
+          "家庭帳**需管理者權限**；`scope=personal` 沿用自己的個人預算。" +
           " **只補空白，不覆蓋**已手動填過的值（B.3 決議）。只複製上月有設定、且該分類在目標月份仍存在的項目。",
+        parameters: [scopeQuery],
         requestBody: {
           required: true,
           ...json({ type: "object", required: ["month"], properties: { month: { type: "string", example: "2026-09" } } }),

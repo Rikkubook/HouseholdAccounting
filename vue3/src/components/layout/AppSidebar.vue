@@ -28,7 +28,8 @@ const appVersion = __APP_VERSION__;
           v-if="item.adminDivider"
           class="mx-5 mt-2 mb-1 font-mono text-[10.5px] tracking-[0.14em] text-fg-4"
         >
-          ADMIN
+          <!-- 個人帳裡這幾頁是每個人自己的設定，不是管理者功能 -->
+          {{ scope.isPersonal ? "SETTINGS" : "ADMIN" }}
         </div>
         <RouterLink
           :to="item.to"

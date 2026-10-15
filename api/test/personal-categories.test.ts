@@ -88,9 +88,30 @@ describe("誰能改哪些分類", () => {
     expect((await api("/categories/reorder?scope=personal", { method: "POST", as: "sis", body: { orderedIds: [...mine, 1] } })).status).toBe(400);
   });
 
-  it("預算不能用個人分類（個人預算尚未開放）", async () => {
-    const budget = await api("/budgets", { method: "PUT", body: { month: "2026-09", mainCategoryId: sisSnack.id, amount: 100 } });
-    expect(budget.status).toBe(400);
+  it("個人預算（PL2-03）：本人可以設定自己個人分類的預算，只出現在自己的個人帳", async () => {
+    const put = (as: "dad" | "sis", amount: number) =>
+      api("/budgets", { method: "PUT", as, body: { month: "2026-10", mainCategoryId: sisSnack.id, amount } });
+    expect((await put("sis", 1500)).status).toBe(200);
+    // 別人的個人分類當作不存在，管理者也一樣
+    expect((await put("dad", 1)).status).toBe(400);
+
+    const mine = await api<{ mainCategoryId: number; amount: number }[]>("/budgets?month=2026-10&scope=personal", { as: "sis" });
+    expect(mine.body).toEqual([expect.objectContaining({ mainCategoryId: sisSnack.id, amount: 1500 })]);
+    const family = await api<{ mainCategoryId: number }[]>("/budgets?month=2026-10");
+    expect(family.body.map((b) => b.mainCategoryId)).not.toContain(sisSnack.id);
+
+    const dash = await api<DashboardPayload>("/summary/dashboard?month=2026-10&scope=personal", { as: "sis" });
+    expect(dash.body.categories.find((c) => c.id === sisSnack.id)?.budget).toBe(1500);
+
+    // 沿用上月也只動自己的個人帳
+    const copy = await api<unknown[]>("/budgets/copy-previous?scope=personal", { method: "POST", as: "sis", body: { month: "2026-11" } });
+    expect(copy.status).toBe(200);
+    expect(copy.body).toHaveLength(1);
+  });
+
+  it("家庭預算仍限管理者", async () => {
+    const res = await api("/budgets", { method: "PUT", as: "sis", body: { month: "2026-10", mainCategoryId: 1, amount: 100 } });
+    expect(res.status).toBe(403);
   });
 });
 

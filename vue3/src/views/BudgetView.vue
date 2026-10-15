@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import FamilyOnlyNotice from "@/components/base/FamilyOnlyNotice.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -12,10 +11,15 @@ import { useBudgetsStore } from "@/stores/budgets";
 import { useCategoriesStore } from "@/stores/categories";
 import { useSubscriptionsStore } from "@/stores/subscriptions";
 import { useUiStore } from "@/stores/ui";
+import { useScopeStore } from "@/stores/scope";
 import { normalizeError } from "@/api/client";
 import { existsInMonth, money } from "@/utils/format";
 
-/** 本頁位於側欄 ADMIN 區，一般成員無法進入，頁內不再區分角色。 */
+/**
+ * 家庭帳：本頁位於側欄 ADMIN 區，只有管理者能進入。
+ * 個人帳：每位成員設定自己個人分類的預算（PL2-03）。
+ */
+const scope = useScopeStore();
 const budgets = useBudgetsStore();
 const cats = useCategoriesStore();
 const subs = useSubscriptionsStore();
@@ -77,21 +81,30 @@ async function load(month: string) {
 }
 
 onMounted(async () => {
-  await Promise.all([cats.load("family"), subs.load("family")]);
+  await Promise.all([cats.load(), subs.load()]);
   await budgets.load();
 });
+
+// 換帳本：改顯示另一本帳的分類與預算
+watch(
+  () => scope.current,
+  async () => {
+    drafts.value = {};
+    await Promise.all([cats.load(), subs.load()]);
+    await budgets.load();
+  }
+);
 </script>
 
 <template>
   <AppShell
     title="預算管理"
-    subtitle="每月各浮動支出分類的上限"
+    :subtitle="scope.isPersonal ? '個人帳每月各浮動支出分類的上限，只有你自己看得到' : '每月各浮動支出分類的上限'"
     back-to="/"
     :loading="budgets.initialLoading"
     :error="budgets.error"
     @retry="budgets.load()"
   >
-    <FamilyOnlyNotice feature="預算" />
     <template #actions>
       <MonthStepper :model-value="budgets.month" @update:model-value="load" />
       <AppButton icon="content_copy" @click="copyPrevious">沿用上月</AppButton>

@@ -93,7 +93,7 @@ watch(() => scope.current, () => store.load());
 
     <div class="flex items-baseline gap-2.5 mt-1">
       <h2 class="text-section font-bold text-fg-1 m-0">浮動支出分類</h2>
-      <span class="text-[11.5px] text-fg-3">{{ scope.isPersonal ? "個人預算尚未開放，只顯示已花費" : "未設預算的分類會顯示設定提示" }}</span>
+      <span class="text-[11.5px] text-fg-3">未設預算的分類會顯示設定提示</span>
     </div>
 
     <!-- 2 欄網格依分類排序自動換行，超過 6 類順勢往下 -->
@@ -102,7 +102,6 @@ watch(() => scope.current, () => store.load());
         v-for="c in store.data?.categories ?? []"
         :key="c.id"
         :category="c"
-        :hide-budget-link="scope.isPersonal"
       />
     </div>
 

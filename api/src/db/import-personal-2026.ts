@@ -3,7 +3,16 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { and, eq, gte, inArray, lt } from "drizzle-orm";
 import { db, sql } from "./index.js";
-import { mainCategories, members, subCategories, transactions, yearExtraExpenses } from "./schema.js";
+import {
+  budgets,
+  mainCategories,
+  members,
+  subCategories,
+  subscriptionRevisions,
+  subscriptions,
+  transactions,
+  yearExtraExpenses,
+} from "./schema.js";
 import { ensurePersonalDefaults } from "../services/categories.js";
 
 /**
@@ -20,6 +29,8 @@ import { ensurePersonalDefaults } from "../services/categories.js";
  * 4. 軟刪除該成員個人帳 2026-01-01～2026-09-30 的交易（家庭帳與別人的個人帳不動）。
  * 5. 塞入試算表資料：每個項目每月一筆，日期為該月最後一天，金額 0／空白略過。
  * 6. 試算表「額外開銷」欄改記為個人年度額外開銷（不分攤到單月）；先刪掉該成員 2026 年的個人額外開銷。
+ * 7. 個人訂閱（10 月起每月 5 號）：同名的已存在就不重建；扣款交易由每日 Cron 產生到個人帳。
+ * 8. 個人預算（2026-10 起的浮動支出上限）：已設定的覆蓋。
  *
  * 記帳者與 owner 都是該成員本人（個人帳的 owner 必須等於記帳者）；created_by 留 null＝系統產生。
  * 金額已四捨五入成整數。可重複執行：上一次塞入的資料也在清除範圍內，結果相同。
@@ -95,6 +106,25 @@ const EXTRAS: { category: string; amount: number }[] = [
   { category: "樂", amount: 6995 },
 ];
 const SHEET_EXTRA_TOTAL = 45234;
+
+/** 個人訂閱（2026-10-16 使用者提供）；電話費金額不固定，不做成訂閱 */
+const SUBSCRIPTIONS = [
+  { name: "共同費", amount: 10000 },
+  { name: "交通費", amount: 1200 },
+];
+const SUBSCRIPTION_START = "2026-10-05";
+
+/** 個人預算：浮動支出每月上限（2026-10-16 使用者提供，試算表「每月預計」欄） */
+const BUDGET_MONTH = "2026-10";
+const BUDGETS: { category: string; amount: number }[] = [
+  { category: "食", amount: 10000 },
+  { category: "衣", amount: 1000 },
+  { category: "住", amount: 1000 },
+  { category: "行", amount: 500 },
+  { category: "健康", amount: 500 },
+  { category: "育", amount: 500 },
+  { category: "樂", amount: 500 },
+];
 
 /** 試算表的「月收入合計」「月支出合計」，用來驗算（支出因四捨五入允許差 1） */
 const SHEET_INCOME = [52733, 66947, 48655, 48855, 49455, 49912, 50608, 48508, 50375];
@@ -226,6 +256,13 @@ console.log(
     " 筆（" + EXTRAS.map((e) => e.category + " " + e.amount).join("、") + "，合計 " + sum(EXTRAS) + "）"
 );
 
+console.log(
+  "個人訂閱：" + SUBSCRIPTIONS.map((s) => s.name + " " + s.amount).join("、") + "（月繳，" + SUBSCRIPTION_START + " 起每月扣款，扣款人「" + owner.name + "」）"
+);
+console.log(
+  "個人預算（" + BUDGET_MONTH + "）：" + BUDGETS.map((b) => b.category + " " + b.amount).join("、") + "，合計 " + sum(BUDGETS)
+);
+
 if (!APPLY) {
   await sql.end();
   process.exit(0);
@@ -338,6 +375,46 @@ await db.transaction(async (tx) => {
       payerId: OWNER_ID,
     }))
   );
+
+  // 7. 個人訂閱：掛在本人的系統分類「訂閱」，與 App 新增訂閱的寫法相同（建立時寫入第一個版本）
+  const [subscriptionCat] = await tx
+    .select({ id: mainCategories.id })
+    .from(mainCategories)
+    .where(and(eq(mainCategories.ownerId, OWNER_ID), eq(mainCategories.systemKey, "subscription")))
+    .limit(1);
+  const existingSubs = await tx
+    .select({ name: subscriptions.name })
+    .from(subscriptions)
+    .where(eq(subscriptions.mainCategoryId, subscriptionCat!.id));
+  for (const s of SUBSCRIPTIONS.filter((x) => !existingSubs.some((e) => e.name === x.name))) {
+    const [created] = await tx
+      .insert(subscriptions)
+      .values({
+        name: s.name,
+        amount: s.amount,
+        cycle: "monthly",
+        nextChargeDate: SUBSCRIPTION_START,
+        chargeDay: Number(SUBSCRIPTION_START.slice(8, 10)),
+        chargeMonth: null,
+        mainCategoryId: subscriptionCat!.id,
+        payerId: OWNER_ID,
+      })
+      .returning({ id: subscriptions.id });
+    await tx.insert(subscriptionRevisions).values({
+      subscriptionId: created!.id,
+      effectiveFrom: SUBSCRIPTION_START.slice(0, 7),
+      amount: s.amount,
+      cycle: "monthly",
+    });
+  }
+
+  // 8. 個人預算
+  for (const b of BUDGETS) {
+    await tx
+      .insert(budgets)
+      .values({ month: BUDGET_MONTH, mainCategoryId: mainIdOf.get(b.category)!, amount: b.amount })
+      .onConflictDoUpdate({ target: [budgets.month, budgets.mainCategoryId], set: { amount: b.amount } });
+  }
 });
 
 console.log("完成。");

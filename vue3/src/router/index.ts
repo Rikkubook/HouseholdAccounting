@@ -19,7 +19,13 @@ const routes: RouteRecordRaw[] = [
   { path: "/transactions", name: "transactions", component: () => import("@/views/TransactionListView.vue") },
   { path: "/stats", name: "stats", component: () => import("@/views/StatsView.vue") },
   { path: "/year", name: "year-summary", component: () => import("@/views/YearSummaryView.vue") },
-  { path: "/budget", name: "budget", component: () => import("@/views/BudgetView.vue"), meta: { admin: true } },
+  {
+    path: "/budget",
+    name: "budget",
+    component: () => import("@/views/BudgetView.vue"),
+    // 家庭預算限管理者；個人帳模式下每位成員都能設定自己的個人預算
+    meta: { admin: true, personalOpen: true },
+  },
   {
     path: "/subscriptions",
     name: "subscriptions",
