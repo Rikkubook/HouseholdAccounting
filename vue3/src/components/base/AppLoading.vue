@@ -6,6 +6,7 @@
 import { computed, onBeforeUnmount, ref, watch } from "vue";
 import AppButton from "@/components/base/AppButton.vue";
 import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
+import { useScopeStore } from "@/stores/scope";
 import type { LoadErrorKind } from "@/utils/loadError";
 
 const props = withDefaults(
@@ -19,6 +20,7 @@ const props = withDefaults(
   { message: "載入中", slowAfter: 8000, error: null, fullscreen: true },
 );
 const emit = defineEmits<{ retry: []; back: [] }>();
+const scope = useScopeStore();
 
 // 失敗畫面只換文字，版型固定
 const FAILS: Record<LoadErrorKind, { icon: string; title: string; desc: string; code: string; retry: boolean }> = {
@@ -69,7 +71,7 @@ onBeforeUnmount(() => window.clearTimeout(timer));
       :role="fail ? 'alert' : 'status'"
       aria-live="polite"
     >
-      <span v-if="!fail" class="text-[17px] font-black tracking-[.02em] text-fg-1">家庭帳</span>
+      <span v-if="!fail" class="text-[17px] font-black tracking-[.02em] text-fg-1">{{ scope.isPersonal ? "個人帳" : "家庭帳" }}</span>
 
       <LoadingSpinner :size="fail ? 48 : 36" :stopped="!!fail" :icon="fail?.icon" />
 

@@ -96,5 +96,6 @@
   --brand-rgb: 15, 143, 122;
   /* 備註淡色：與家庭帳相同，取主色約加 32% 白 */
   --note: #5cb3a5;
+  --brand-magenta: #4fb389; /* 漸層與載入圓環的終點色 */
   --gradient-brand: linear-gradient(135deg, #0f8f7a, #4fb389);
 }
