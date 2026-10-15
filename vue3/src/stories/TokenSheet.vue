@@ -13,7 +13,17 @@ const colors = [
   ["--brand-600", "#5a44e0", "紫色文字"],
   ["--brand-tint", "#f1eefe", "選中底色"],
   ["--note", "#9a8fe8", "備註文字"],
+  ["--brand-magenta", "#b04bd6", "品牌漸層終點／載入圓環"],
 ];
+/** 切到個人帳時（<html data-ledger="personal">）覆寫的品牌色，其餘 token 不變 */
+const personal = [
+  ["--brand-500", "#0f8f7a", "個人帳主色"],
+  ["--brand-600", "#0b7565", "青綠文字"],
+  ["--brand-tint", "#e3f4f0", "選中底色"],
+  ["--note", "#5cb3a5", "備註文字"],
+  ["--brand-magenta", "#4fb389", "漸層終點／載入圓環"],
+];
+const personalGradient = "linear-gradient(135deg,#0f8f7a,#4fb389)";
 const gradients = [
   ["--gradient-brand", "linear-gradient(135deg,#6b5cf5,#b04bd6)", "身分／開關／佔比"],
   ["--gradient-action", "linear-gradient(140deg,#2f6bf5,#22b8e6)", "主要動作／浮動按鈕"],
@@ -58,6 +68,29 @@ const layout = [
           <span class="flex flex-col gap-0.5 min-w-0">
             <span class="font-mono text-[11px] text-fg-1">{{ name }}</span>
             <span class="text-[10.5px] text-fg-4 truncate">{{ value }} · {{ note }}</span>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <section class="flex flex-col gap-3">
+      <h2 class="text-section font-bold text-fg-1 m-0">個人帳色彩</h2>
+      <p class="m-0 text-[12px] text-fg-3">
+        切到個人帳時 <code class="font-mono">&lt;html data-ledger="personal"&gt;</code>，tokens.css 只覆寫下面這幾個，其他沿用上方。
+      </p>
+      <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(212px, 1fr))">
+        <div v-for="[name, value, note] in personal" :key="name" class="flex items-center gap-2.5 min-w-0">
+          <span class="w-10 h-10 shrink-0 rounded-md border" :style="{ background: value }" />
+          <span class="flex flex-col gap-0.5 min-w-0">
+            <span class="font-mono text-[11px] text-fg-1">{{ name }}</span>
+            <span class="text-[10.5px] text-fg-4 truncate">{{ value }} · {{ note }}</span>
+          </span>
+        </div>
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="w-10 h-10 shrink-0 rounded-md" :style="{ background: personalGradient }" />
+          <span class="flex flex-col gap-0.5 min-w-0">
+            <span class="font-mono text-[11px] text-fg-1">--gradient-brand</span>
+            <span class="text-[10.5px] text-fg-4 truncate">個人帳漸層 · Logo／開關</span>
           </span>
         </div>
       </div>
