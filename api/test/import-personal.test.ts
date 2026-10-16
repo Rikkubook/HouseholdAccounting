@@ -30,13 +30,13 @@ let misfiledId: number;
 
 beforeAll(async () => {
   // 舊版留下的狀態：個人交易記在家庭分類「食／早餐」底下（App 現在已經不允許這樣記）
-  const [{ id: subId }] = await sql<{ id: number }[]>`
+  const [sub] = await sql<{ id: number }[]>`
     select s.id from sub_categories s join main_categories m on m.id = s.main_category_id
     where m.name = '食' and m.owner_id is null and s.name = '早餐'`;
   const [row] = await sql<{ id: number }[]>`
     insert into transactions (type, main_category_id, sub_category_id, amount, date, payer_id, owner_id,
                               main_category_name, sub_category_name)
-    values ('expense', 1, ${subId}, 85, '2026-10-03', 1, 1, '食', '早餐')
+    values ('expense', 1, ${sub!.id}, 85, '2026-10-03', 1, 1, '食', '早餐')
     returning id`;
   misfiledId = row!.id;
   runImport();
