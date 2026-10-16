@@ -80,8 +80,7 @@ const footer = computed(() => {
  * 全年收入 − 支出合計的年度總計（含額外開銷），額外開銷欄以負數列出差額。
  *
  * 帳本有投資分類時再加投資合計、剩餘現金兩列（個人帳規格 6.3）：投資不算支出，
- * 月結餘＝收入 − 支出，計算時不含投資（投資沒扣），沿用使用者試算表的說法標成「月剩餘金額（不含投資）」；
- * 剩餘現金＝月結餘 − 投資。
+ * 月結餘＝收入 − 支出，投資還沒扣，所以標成「月結餘（含投資）」；剩餘現金＝月結餘 − 投資。
  * 年度總計的算法和家庭帳一樣，含年度額外開銷。家庭帳沒有投資，不加這兩列。
  */
 const balanceRows = computed(() => {
@@ -131,9 +130,12 @@ const balanceRows = computed(() => {
     },
   ];
 });
-/** 個人帳有投資時，月結餘沒扣投資；用試算表的說法標明「不含投資」（2026-10-16 使用者決定） */
-const netLabel = computed(() => (data.value?.hasInvestment ? "月剩餘金額（不含投資）" : "月結餘"));
+/** 個人帳有投資時，月結餘還沒扣投資，標明「含投資」 */
+const netLabel = computed(() => (data.value?.hasInvestment ? "月結餘（含投資）" : "月結餘"));
 const yearNet = computed(() => balanceRows.value[1]!.total);
+/** 有投資時，年度彙整以剩餘現金（收入 − 支出 − 投資）為主（2026-10-16 使用者決定）；家庭帳沒有投資就等於結餘 */
+const yearCash = computed(() => yearNet.value - (data.value?.investment ?? 0));
+const monthCash = (m: { net: number; investment: number } | null) => (m === null ? null : m.net - m.investment);
 
 /** 結餘為負時標紅 */
 const netClass = (v: number | null) => (v !== null && v < 0 ? "text-danger" : "text-fg-1");
@@ -279,12 +281,12 @@ onMounted(async () => {
           /></div>
         <div class="md:pl-5 md:border-l">
           <MetricStat
-            :label="data?.hasInvestment ? '結餘（不含投資）' : '結餘'"
-            :value="data ? yearNet : null"
+            :label="data?.hasInvestment ? '剩餘現金' : '結餘'"
+            :value="data ? (data.hasInvestment ? yearCash : yearNet) : null"
             size="md"
             :hint="
               data?.hasInvestment
-                ? '扣掉投資後剩餘現金 ' + money(yearNet - data.investment)
+                ? '結餘（含投資）' + money(yearNet)
                 : '包含年度額外開銷' + (footer.extra ? ' ' + money(footer.extra) : '')
             "
           />
@@ -435,21 +437,28 @@ onMounted(async () => {
     <div class="md:hidden flex flex-col gap-3.5">
       <AppCard v-if="data" pad="compact">
         <div class="flex items-center gap-2">
-          <span class="text-[14.5px] font-bold text-fg-1">{{ netLabel }}</span>
-          <span class="ml-auto text-[16px] font-bold tnum" :class="netClass(yearNet)">
-            年度結餘 {{ money(yearNet) }}
+          <span class="text-[14.5px] font-bold text-fg-1">{{ data.hasInvestment ? "剩餘現金" : netLabel }}</span>
+          <span
+            class="ml-auto text-[16px] font-bold tnum"
+            :class="netClass(data.hasInvestment ? yearCash : yearNet)"
+          >
+            {{ data.hasInvestment ? "年度剩餘現金 " + money(yearCash) : "年度結餘 " + money(yearNet) }}
           </span>
         </div>
         <div v-if="data.hasInvestment" class="mt-1.5 flex gap-4 text-[11px] text-fg-3">
           <span>投資 {{ money(data.investment) }}</span>
-          <span :class="netClass(yearNet - data.investment)">剩餘現金 {{ money(yearNet - data.investment) }}</span>
+          <span :class="netClass(yearNet)">月結餘（含投資）{{ money(yearNet) }}</span>
         </div>
         <div class="mt-3 pt-3 border-t overflow-x-auto">
           <div class="flex gap-3 min-w-max">
             <span v-for="(m, i) in data.monthly" :key="i" class="flex flex-col items-end gap-0.5">
               <span class="font-mono text-[10px] text-fg-4">{{ i + 1 }}月</span>
-              <span class="font-mono text-[12px] tnum" :class="netClass(m?.net ?? null)">
-                {{ m === null ? "—" : money(m.net) }}
+              <!-- 有投資時大數字是剩餘現金，否則是月結餘 -->
+              <span
+                class="font-mono text-[12px] tnum"
+                :class="netClass(data.hasInvestment ? monthCash(m) : m?.net ?? null)"
+              >
+                {{ m === null ? "—" : money(data.hasInvestment ? monthCash(m)! : m.net) }}
               </span>
               <span class="font-mono text-[10px] text-fg-4 tnum">收 {{ m === null ? "—" : money(m.income) }}</span>
               <span class="font-mono text-[10px] text-fg-4 tnum">支 {{ m === null ? "—" : money(m.expense) }}</span>
