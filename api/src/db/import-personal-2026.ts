@@ -24,7 +24,8 @@ import { ensurePersonalDefaults } from "../services/categories.js";
  *
  * 執行時（同一個 DB transaction，失敗整批還原）：
  * 1. 建立該成員的個人分類（已存在同名同類型的就沿用），含系統分類「其他」「訂閱」。
- * 2. 該成員記在家庭分類下的個人交易，搬到同名的個人分類（沒有同名的放「其他」）。
+ * 2. 該成員記在家庭分類下的個人交易，搬到同名的個人分類（沒有同名的放「其他」）；子分類一併保留，
+ *    個人分類底下沒有同名子分類就先建立。
  * 3. 把要清掉的資料先存成 api/backups/*.json。
  * 4. 軟刪除該成員個人帳 2026-01-01～2026-09-30 的交易（家庭帳與別人的個人帳不動）。
  * 5. 塞入試算表資料：每個項目每月一筆，日期為該月最後一天，金額 0／空白略過。
@@ -326,12 +327,27 @@ await db.transaction(async (tx) => {
     }
   }
 
-  // 2. 記在家庭分類下的個人交易搬到同名個人分類；子分類同名才保留
+  // 2. 記在家庭分類下的個人交易搬到同名個人分類。
+  //    子分類保留：個人分類底下沒有同名子分類就先建立（上一版會把子項目清空，例如「早餐」變成只剩「食」）。
+  //    沒有同名主分類時放「其他」；「其他」是系統分類、不設子分類，子項目無法保留。
   for (const t of misfiledToMove) {
     const familyName = familyMains.find((m) => m.id === t.mainCategoryId)!.name;
     const mainName = mainIdOf.has(familyName) ? familyName : "其他";
     const mainId = mainIdOf.get(mainName)!;
-    const subId = t.subCategoryName ? (subIdOf.get(mainId + "|" + t.subCategoryName) ?? null) : null;
+    let subId = t.subCategoryName ? (subIdOf.get(mainId + "|" + t.subCategoryName) ?? null) : null;
+    if (t.subCategoryName && subId == null && mainName !== "其他") {
+      const [created] = await tx
+        .insert(subCategories)
+        .values({
+          mainCategoryId: mainId,
+          name: t.subCategoryName,
+          // 排在這個主分類現有子分類的最後
+          sortOrder: [...subIdOf.keys()].filter((k) => k.startsWith(mainId + "|")).length + 1,
+        })
+        .returning({ id: subCategories.id });
+      subId = created!.id;
+      subIdOf.set(mainId + "|" + t.subCategoryName, subId);
+    }
     await tx
       .update(transactions)
       .set({

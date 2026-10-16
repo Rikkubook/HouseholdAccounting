@@ -11,6 +11,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:force-import-2026": "tsx src/db/force-import-2026.ts",
     "db:import-personal-2026": "tsx src/db/import-personal-2026.ts",
+    "db:repair-personal-subs-2026": "tsx src/db/repair-personal-subs-2026.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },
