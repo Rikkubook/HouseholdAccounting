@@ -202,10 +202,12 @@ categories.push({
   isActive: true, isSystem: true, systemKey: "subscription", activeFrom: null, archivedFrom: null, subCategories: [],
   ownerId: PERSONAL_OWNER,
 } as MainCategory);
-// 預覽用的個人訂閱範例（10 月起；正式匯入不會建立，由本人在訂閱管理新增）
+// 預覽用的個人訂閱範例（10 月起）：記在同名的固定支出分類，年度彙整跟 1～9 月同一列
+const personalCatId = (name: string) =>
+  categories.find((c) => c.name === name && (c as MainCategory & { ownerId?: number }).ownerId === PERSONAL_OWNER)!.id;
 subscriptions.push(
-  { id: 201, name: "共同費", amount: 10000, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: 298, payerId: PERSONAL_OWNER, isActive: true },
-  { id: 202, name: "交通費", amount: 1200, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: 298, payerId: PERSONAL_OWNER, isActive: true }
+  { id: 201, name: "共同費", amount: 10000, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: personalCatId("共同費"), payerId: PERSONAL_OWNER, isActive: true },
+  { id: 202, name: "交通費", amount: 1200, cycle: "monthly", nextChargeDate: "2026-10-31", chargeDay: 31, chargeMonth: null, periodAmount: null, mainCategoryId: personalCatId("交通費"), payerId: PERSONAL_OWNER, isActive: true }
 );
 categories.push({
   id: 299, name: "其他", icon: "category", type: "expense", nature: "floating", sortOrder: 999,

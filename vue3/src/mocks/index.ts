@@ -86,6 +86,17 @@ function scopedSubscriptions(scope?: string): Subscription[] {
 }
 
 /** 該帳本的分類：家庭帳取家庭分類，個人帳只取登入者自己的 */
+/** 與後端 resolveSubscriptionCategory 一致：沒指定就是「訂閱」；指定的要是同一本帳啟用中的固定支出分類 */
+function subscriptionCategoryOf(scope: string | undefined, requested?: number): number {
+  const mine = scopedCategories(scope);
+  if (requested == null) return mine.find((c) => c.systemKey === "subscription")!.id;
+  const cat = mine.find((c) => c.id === requested);
+  if (!cat || cat.type !== "expense" || cat.nature !== "fixed" || !cat.isActive) {
+    throw { code: "bad_request", message: "訂閱只能記在這本帳啟用中的固定支出分類" };
+  }
+  return cat.id;
+}
+
 function scopedCategories(scope?: string): MainCategory[] {
   if (scope !== "personal") return db.categories.filter((c) => ownerOf(c) == null);
   ensurePersonalDefaults(currentUserId);
@@ -181,6 +192,9 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
     if (cat.isSystem) throw { code: "system_category", message: "系統保留分類不可停用" };
     cat.isActive = false;
     cat.archivedFrom = new Date().toISOString().slice(0, 7);
+    // 與後端一致：掛在這個分類的訂閱改回同一本帳的「訂閱」
+    const fallback = subscriptionCategoryOf((cat as OwnedCategory).ownerId == null ? "family" : "personal");
+    db.subscriptions.filter((x) => x.mainCategoryId === cat.id).forEach((x) => (x.mainCategoryId = fallback));
     return cat;
   }],
   [/^\/categories\/(\d+)\/restore$/, "post", (m) => {
@@ -328,16 +342,16 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   // ── subscriptions ─────────────────────────────────────
   [/^\/subscriptions$/, "get", (_m, _b, q) => scopedSubscriptions(q.scope)],
   [/^\/subscriptions$/, "post", (_m, body, q) => {
-    // 訂閱一律歸屬該帳本的系統分類「訂閱」；個人訂閱的扣款人只能是自己，與後端一致
+    // 與後端一致：分類預設「訂閱」，可選同一本帳啟用中的固定支出分類；個人訂閱的扣款人只能是自己
     if (q.scope === "personal" && body.payerId !== currentUserId) {
       throw { code: "bad_request", message: "個人訂閱的扣款人只能是自己" };
     }
-    const subscriptionCat = scopedCategories(q.scope).find((c) => c.systemKey === "subscription")!;
+    const mainCategoryId = subscriptionCategoryOf(q.scope, body.mainCategoryId);
     const s: Subscription = {
       id: ++seq,
       isActive: true,
       ...body,
-      mainCategoryId: subscriptionCat.id,
+      mainCategoryId,
       chargeDay: Number(body.nextChargeDate.slice(8, 10)),
       chargeMonth: body.cycle === "yearly" ? Number(body.nextChargeDate.slice(5, 7)) : null,
       periodAmount: null,
@@ -347,6 +361,10 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   }],
   [/^\/subscriptions\/(\d+)$/, "patch", (m, body) => {
     const s = db.subscriptions.find((x) => x.id === Number(m[1]))!;
+    if (body.mainCategoryId !== undefined) {
+      const owner = (db.categories.find((c) => c.id === s.mainCategoryId) as OwnedCategory | undefined)?.ownerId;
+      subscriptionCategoryOf(owner == null ? "family" : "personal", body.mainCategoryId);
+    }
     // 年繳分攤進行中：週期與扣款日要等本期結束才能改（與後端一致）
     const midPeriod = s.cycle === "yearly" && s.chargeMonth != null && installmentIndex(s.nextChargeDate, s.chargeMonth) !== 0;
     const scheduleChanged =

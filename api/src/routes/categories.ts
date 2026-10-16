@@ -13,7 +13,7 @@ import {
   subNameSchema,
 } from "@family-ledger/shared";
 import { db } from "../db/index.js";
-import { mainCategories, subCategories } from "../db/schema.js";
+import { mainCategories, subCategories, subscriptions } from "../db/schema.js";
 import { badRequest, conflict, forbidden, notFound } from "../lib/errors.js";
 import { currentMonth } from "../lib/dates.js";
 import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
@@ -23,6 +23,7 @@ import {
   isInScope,
   listCategories,
   scopeOfCategory,
+  subscriptionCategoryId,
 } from "../services/categories.js";
 import { categoryScope, resolveScope, type Scope } from "../services/scope.js";
 
@@ -109,16 +110,23 @@ categoryRoutes.patch("/:id", idParam, zValidator("json", mainCategoryPatchSchema
   return c.json((await findCategory(id))!);
 });
 
-/** 只能停用，不提供刪除；歷史交易保留原分類。停用年月＝當月，未來月份顯示「—」。 */
+/**
+ * 只能停用，不提供刪除；歷史交易保留原分類。停用年月＝當月，未來月份顯示「—」。
+ * 掛在這個分類的訂閱改回該帳本的「訂閱」，之後的扣款不會記到停用的分類（已產生的交易不動）。
+ */
 categoryRoutes.post("/:id/archive", idParam, async (c) => {
   const { id } = c.req.valid("param");
   const target = await loadWritableMain(c.get("user"), id);
   if (target.isSystem) throw conflict("系統分類不可停用", "system_category");
 
-  await db
-    .update(mainCategories)
-    .set({ isActive: false, archivedFrom: currentMonth() })
-    .where(eq(mainCategories.id, id));
+  const fallback = await subscriptionCategoryId(scopeOfCategory(target));
+  await db.transaction(async (tx) => {
+    await tx
+      .update(mainCategories)
+      .set({ isActive: false, archivedFrom: currentMonth() })
+      .where(eq(mainCategories.id, id));
+    await tx.update(subscriptions).set({ mainCategoryId: fallback }).where(eq(subscriptions.mainCategoryId, id));
+  });
 
   return c.json((await findCategory(id))!);
 });

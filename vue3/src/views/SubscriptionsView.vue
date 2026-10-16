@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import AppButton from "@/components/base/AppButton.vue";
@@ -37,10 +37,20 @@ interface Form {
   cycle: BillingCycle;
   nextChargeDate: string;
   payerId: number;
+  /** 扣款記到的分類（預設「訂閱」） */
+  mainCategoryId: number;
   /** 年繳分攤進行中：週期與扣款日鎖住，顯示這段說明（G-6） */
   lockedNote?: string;
 }
 const form = ref<Form | null>(null);
+
+/** 訂閱可以記到這本帳啟用中的固定支出分類；系統分類「訂閱」排第一個當預設 */
+const categoryOptions = computed(() =>
+  cats.items
+    .filter((c) => c.type === "expense" && c.nature === "fixed" && c.isActive)
+    .sort((a, b) => Number(b.systemKey === "subscription") - Number(a.systemKey === "subscription"))
+);
+const defaultCategoryId = () => categoryOptions.value.find((c) => c.systemKey === "subscription")?.id ?? 0;
 
 function openNew() {
   form.value = {
@@ -49,6 +59,7 @@ function openNew() {
     cycle: "monthly",
     nextChargeDate: todayISO(),
     payerId: (scope.isPersonal ? auth.user?.id : members.active[0]?.id) ?? 1,
+    mainCategoryId: defaultCategoryId(),
   };
 }
 
@@ -62,6 +73,7 @@ function openEdit(sub: Subscription) {
     // 年繳顯示實際年繳日；分攤中鎖住不送出，不會誤改到每月的分攤日
     nextChargeDate: displayChargeDate(sub),
     payerId: sub.payerId,
+    mainCategoryId: sub.mainCategoryId,
     lockedNote: paid
       ? "本期已分攤 " + paid + "/" + INSTALLMENTS + "，週期與扣款日要等本期結束才能改；改金額從下一期起生效"
       : undefined,
@@ -79,6 +91,7 @@ async function submit() {
     cycle: v.cycle,
     nextChargeDate: v.nextChargeDate,
     payerId: v.payerId,
+    ...(v.mainCategoryId ? { mainCategoryId: v.mainCategoryId } : {}),
   };
   if (v.id) {
     if (v.lockedNote) {
@@ -217,7 +230,17 @@ watch(
           />
         </FormField>
 
-        <p class="m-0 text-[11.5px] text-fg-3">訂閱一律歸屬「訂閱」分類，停用後攤提到已繳期間結束</p>
+        <FormField label="記到分類">
+          <select
+            v-model.number="form.mainCategoryId"
+            class="h-[46px] px-3 rounded-lg border border-strong bg-surface text-[14px] text-fg-1 outline-none box-border w-full"
+          >
+            <option v-for="c in categoryOptions" :key="c.id" :value="c.id">{{ c.name }}</option>
+          </select>
+        </FormField>
+        <p class="m-0 text-[11.5px] text-fg-3">
+          自動扣款記到這個分類，只能選固定支出分類；分類停用時會自動改回「訂閱」。停用訂閱後攤提到已繳期間結束
+        </p>
       </template>
 
       <template #footer>

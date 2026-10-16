@@ -24,8 +24,8 @@ import { INSTALLMENTS, currentMonth, installmentIndex, monthOf, nextAnnualCharge
 import { requireAuth, type AppEnv, type AuthUser } from "../middleware/auth.js";
 import { findView } from "../services/views.js";
 import { canCharge, chargeOnce } from "../services/charges.js";
-import { ensurePersonalDefaults } from "../services/categories.js";
-import { categoryScope, resolveScope, subscriptionScope, type Scope } from "../services/scope.js";
+import { resolveSubscriptionCategory } from "../services/categories.js";
+import { resolveScope, subscriptionScope, type Scope } from "../services/scope.js";
 
 const idParam = zValidator("param", z.object({ id: idSchema }));
 const scopeQuery = zValidator("query", categoryScopeQuerySchema);
@@ -33,7 +33,8 @@ const scopeQuery = zValidator("query", categoryScopeQuerySchema);
 export const subscriptionRoutes = new Hono<AppEnv>();
 
 /**
- * 訂閱屬於哪本帳，看它掛的系統分類「訂閱」是家庭的還是個人的（沒有自己的 owner_id）。
+ * 訂閱屬於哪本帳，看它掛的分類是家庭的還是個人的（訂閱沒有自己的 owner_id）。
+ * 分類預設是該帳本的系統分類「訂閱」，也可以選同一本帳的固定支出分類（例如「共同費」）。
  * 家庭帳：讀取開放全員（儀表板要用），寫入限管理者。
  * 個人帳（個人帳第 2 批 PL2-02）：每位成員管自己的，扣款人固定是本人；別人的一律當作不存在。
  */
@@ -73,7 +74,7 @@ subscriptionRoutes.post("/", scopeQuery, zValidator("json", subscriptionDraftSch
   const scope = resolveScope(user, c.req.valid("query").scope);
   assertCanWrite(user, scope);
   await assertPayer(draft.payerId, scope);
-  const mainCategoryId = await subscriptionCategoryId(scope);
+  const mainCategoryId = await resolveSubscriptionCategory(scope, draft.mainCategoryId);
 
   const row = await db.transaction(async (tx) => {
     // chargeDay 取首次扣款日的日數，作為之後推算的錨點
@@ -107,6 +108,8 @@ subscriptionRoutes.patch("/:id", idParam, zValidator("json", subscriptionPatchSc
 
   const { current, scope } = await loadWritable(c.get("user"), id);
   if (patch.payerId) await assertPayer(patch.payerId, scope);
+  // 換分類：只能換到同一本帳的固定支出分類，之後的扣款記到新分類；已產生的交易不動
+  if (patch.mainCategoryId !== undefined) await resolveSubscriptionCategory(scope, patch.mainCategoryId);
 
   const nextAmount = patch.amount ?? current.amount;
   const nextCycle = patch.cycle ?? current.cycle;
@@ -207,21 +210,6 @@ subscriptionRoutes.get("/:id/revisions", idParam, async (c) => {
     .orderBy(desc(subscriptionRevisions.effectiveFrom));
   return c.json<SubscriptionRevision[]>(rows);
 });
-
-/**
- * 訂閱一律歸屬該帳本的系統分類「訂閱」（家庭：sql/0001；個人：第一次使用時自動建立）：
- * 它不可停用，所以不會發生「分類停用了、訂閱還在扣款與攤提」的情況。
- */
-async function subscriptionCategoryId(scope: Scope): Promise<number> {
-  if (scope.kind === "personal") await ensurePersonalDefaults(scope.ownerId);
-  const [cat] = await db
-    .select({ id: mainCategories.id })
-    .from(mainCategories)
-    .where(and(eq(mainCategories.systemKey, "subscription"), categoryScope(scope)))
-    .limit(1);
-  if (!cat) throw new Error("找不到系統分類「訂閱」，請先執行 db:push");
-  return cat.id;
-}
 
 /** 個人帳的扣款人固定是本人（個人帳交易的 owner 必須等於記帳者） */
 async function assertPayer(payerId: number, scope: Scope): Promise<void> {

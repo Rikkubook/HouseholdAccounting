@@ -636,7 +636,7 @@ export const openApiDocument = {
       post: {
         tags: ["subscriptions"],
         summary: "新增訂閱",
-        description: SUB_WRITE + "\n\n訂閱一律歸屬該帳本的系統分類「訂閱」，由後端填入，不接受前端傳 `mainCategoryId`。`scope=personal` 建立在自己的個人帳，`payerId` 必須是自己，自動扣款的交易記到個人帳。",
+        description: SUB_WRITE + "\n\n`mainCategoryId` 是自動扣款記到的分類：同一本帳、啟用中的**固定支出**分類；省略＝該帳本的系統分類「訂閱」。分類停用時，底下的訂閱自動改回「訂閱」。`scope=personal` 建立在自己的個人帳，`payerId` 必須是自己，自動扣款的交易記到個人帳。",
         parameters: [scopeQuery],
         requestBody: { required: true, ...json(ref("SubscriptionDraft")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors },
@@ -649,7 +649,8 @@ export const openApiDocument = {
         description:
           SUB_WRITE +
           " 金額或週期變更會寫入歷史版本（自當月生效），**舊期間仍以當時金額計算**。" +
-          "年繳分攤進行中（第 2～12 期）不能改週期與扣款日（400）；改金額從下一期起生效。",
+          "年繳分攤進行中（第 2～12 期）不能改週期與扣款日（400）；改金額從下一期起生效。" +
+          "可換 `mainCategoryId`（同樣只能換到同一本帳、啟用中的固定支出分類），之後的扣款記到新分類，已產生的交易不動。",
         parameters: [pathId()],
         requestBody: { required: true, ...json(ref("SubscriptionPatch")) },
         responses: { 200: okJson(ref("Subscription")), ...commonErrors, 404: err("訂閱不存在，或是別人的個人訂閱") },

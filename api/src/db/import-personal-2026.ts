@@ -29,7 +29,8 @@ import { ensurePersonalDefaults } from "../services/categories.js";
  * 4. 軟刪除該成員個人帳 2026-01-01～2026-09-30 的交易（家庭帳與別人的個人帳不動）。
  * 5. 塞入試算表資料：每個項目每月一筆，日期為該月最後一天，金額 0／空白略過。
  * 6. 試算表「額外開銷」欄改記為個人年度額外開銷（不分攤到單月）；先刪掉該成員 2026 年的個人額外開銷。
- * 7. 個人訂閱（10 月起每月 5 號）：同名的已存在就不重建；扣款交易由每日 Cron 產生到個人帳。
+ * 7. 個人訂閱（10 月起每月 5 號）：記在同名的個人分類（共同費、交通費）；同名的已存在就只改正分類，不重建。
+ *    扣款交易由每日 Cron 產生到個人帳。
  * 8. 個人預算（2026-10 起的浮動支出上限）：已設定的覆蓋。
  *
  * 記帳者與 owner 都是該成員本人（個人帳的 owner 必須等於記帳者）；created_by 留 null＝系統產生。
@@ -376,17 +377,20 @@ await db.transaction(async (tx) => {
     }))
   );
 
-  // 7. 個人訂閱：掛在本人的系統分類「訂閱」，與 App 新增訂閱的寫法相同（建立時寫入第一個版本）
-  const [subscriptionCat] = await tx
-    .select({ id: mainCategories.id })
-    .from(mainCategories)
-    .where(and(eq(mainCategories.ownerId, OWNER_ID), eq(mainCategories.systemKey, "subscription")))
-    .limit(1);
-  const existingSubs = await tx
-    .select({ name: subscriptions.name })
+  // 7. 個人訂閱：記在同名的個人固定支出分類（共同費、交通費），年度彙整跟 1～9 月同一列。
+  //    與 App 新增訂閱的寫法相同（建立時寫入第一個版本）；已存在的同名訂閱只把分類改正（上一版記在「訂閱」）
+  const ownSubs = await tx
+    .select({ id: subscriptions.id, name: subscriptions.name })
     .from(subscriptions)
-    .where(eq(subscriptions.mainCategoryId, subscriptionCat!.id));
-  for (const s of SUBSCRIPTIONS.filter((x) => !existingSubs.some((e) => e.name === x.name))) {
+    .innerJoin(mainCategories, eq(mainCategories.id, subscriptions.mainCategoryId))
+    .where(eq(mainCategories.ownerId, OWNER_ID));
+  for (const s of SUBSCRIPTIONS) {
+    const mainCategoryId = mainIdOf.get(s.name)!;
+    const existing = ownSubs.find((e) => e.name === s.name);
+    if (existing) {
+      await tx.update(subscriptions).set({ mainCategoryId }).where(eq(subscriptions.id, existing.id));
+      continue;
+    }
     const [created] = await tx
       .insert(subscriptions)
       .values({
@@ -396,7 +400,7 @@ await db.transaction(async (tx) => {
         nextChargeDate: SUBSCRIPTION_START,
         chargeDay: Number(SUBSCRIPTION_START.slice(8, 10)),
         chargeMonth: null,
-        mainCategoryId: subscriptionCat!.id,
+        mainCategoryId,
         payerId: OWNER_ID,
       })
       .returning({ id: subscriptions.id });

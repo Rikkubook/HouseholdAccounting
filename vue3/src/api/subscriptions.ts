@@ -7,7 +7,8 @@ export interface SubscriptionDraft {
   amount: number;
   cycle: BillingCycle;
   nextChargeDate: string;
-  /** 不傳分類：訂閱一律歸屬系統分類「訂閱」，由後端填入 */
+  /** 扣款記到的分類：同一本帳啟用中的固定支出分類；不傳＝系統分類「訂閱」 */
+  mainCategoryId?: number;
   payerId: number;
 }
 

@@ -263,7 +263,11 @@ export const subscriptionDraftSchema = z.object({
   amount: amountSchema,
   cycle: billingCycleSchema,
   nextChargeDate: dateSchema,
-  // 不接受 mainCategoryId：訂閱一律歸屬系統分類「訂閱」，由後端填入
+  /**
+   * 扣款記到哪個分類：同一本帳、啟用中的固定支出分類；省略＝系統分類「訂閱」。
+   * 分類停用時，底下的訂閱自動改回「訂閱」（2026-10-16 使用者決定）。
+   */
+  mainCategoryId: z.number().int().positive().optional(),
   payerId: z.number().int().positive(),
 });
 
