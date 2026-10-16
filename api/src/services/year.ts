@@ -89,7 +89,7 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
     const mIncome = inMonth.find((r) => r.type === "income")?.amount ?? 0;
     const mExpense = inMonth.find((r) => r.type === "expense")?.amount ?? 0;
     const mInvestment = inMonth.find((r) => r.type === "investment")?.amount ?? 0;
-    // 結餘＝收入 − 支出（含投資，投資還沒扣）；剩餘現金由前端以 net − investment 算出
+    // 結餘＝收入 − 支出（不含投資：投資沒扣）；剩餘現金由前端以 net − investment 算出
     return { income: mIncome, expense: mExpense, investment: mInvestment, net: mIncome - mExpense };
   });
 

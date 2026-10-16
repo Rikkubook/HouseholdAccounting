@@ -62,7 +62,7 @@ watch(() => scope.current, () => store.load());
           <div class="md:pl-5 md:border-l"><MetricStat label="總支出" :value="summary?.expense ?? null" size="md" /></div>
           <div class="col-span-2 md:col-span-1 md:pl-5 md:border-l">
             <MetricStat
-              :label="summary?.hasInvestment ? '淨結餘（含投資）' : '淨結餘'"
+              :label="summary?.hasInvestment ? '淨結餘（不含投資）' : '淨結餘'"
               :value="summary?.net ?? null"
               size="md"
             />

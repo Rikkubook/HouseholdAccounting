@@ -80,7 +80,8 @@ const footer = computed(() => {
  * 全年收入 − 支出合計的年度總計（含額外開銷），額外開銷欄以負數列出差額。
  *
  * 帳本有投資分類時再加投資合計、剩餘現金兩列（個人帳規格 6.3）：投資不算支出，
- * 月結餘＝收入 − 支出，投資還沒扣，所以標成「月結餘（含投資）」；剩餘現金＝月結餘 − 投資。
+ * 月結餘＝收入 − 支出，計算時不含投資（投資沒扣），沿用使用者試算表的說法標成「月剩餘金額（不含投資）」；
+ * 剩餘現金＝月結餘 − 投資。
  * 年度總計的算法和家庭帳一樣，含年度額外開銷。家庭帳沒有投資，不加這兩列。
  */
 const balanceRows = computed(() => {
@@ -130,8 +131,8 @@ const balanceRows = computed(() => {
     },
   ];
 });
-/** 個人帳有投資時，月結餘還沒扣投資，標明「含投資」 */
-const netLabel = computed(() => (data.value?.hasInvestment ? "月結餘（含投資）" : "月結餘"));
+/** 個人帳有投資時，月結餘沒扣投資；用試算表的說法標明「不含投資」（2026-10-16 使用者決定） */
+const netLabel = computed(() => (data.value?.hasInvestment ? "月剩餘金額（不含投資）" : "月結餘"));
 const yearNet = computed(() => balanceRows.value[1]!.total);
 
 /** 結餘為負時標紅 */
@@ -278,12 +279,12 @@ onMounted(async () => {
           /></div>
         <div class="md:pl-5 md:border-l">
           <MetricStat
-            :label="data?.hasInvestment ? '結餘（含投資）' : '結餘'"
+            :label="data?.hasInvestment ? '結餘（不含投資）' : '結餘'"
             :value="data ? yearNet : null"
             size="md"
             :hint="
               data?.hasInvestment
-                ? '含投資；剩餘現金 ' + money(yearNet - data.investment)
+                ? '扣掉投資後剩餘現金 ' + money(yearNet - data.investment)
                 : '包含年度額外開銷' + (footer.extra ? ' ' + money(footer.extra) : '')
             "
           />
