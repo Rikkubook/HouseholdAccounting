@@ -11,6 +11,7 @@ import TransactionDayHeader from "@/components/data/TransactionDayHeader.vue";
 import { groupByDate } from "@/utils/transactions";
 import { txGridColumns } from "@/components/data/transactionGrid";
 import FloatingActionButton from "@/components/base/FloatingActionButton.vue";
+import LoadingSpinner from "@/components/base/LoadingSpinner.vue";
 import { useDashboardStore } from "@/stores/dashboard";
 import { useScopeStore } from "@/stores/scope";
 import { addMonths, currentMonth } from "@/utils/format";
@@ -41,6 +42,10 @@ watch(() => scope.current, () => store.load());
     @retry="store.load()"
   >
     <template #actions>
+      <!-- 切換月份時資料還沒到：明確提示，不然數字不動看起來像壞掉 -->
+      <span v-if="store.loading" class="self-center inline-flex items-center gap-1.5 text-[12px] text-fg-3" role="status">
+        <LoadingSpinner :size="14" />載入中
+      </span>
       <SegmentedControl :options="periodOptions" :model-value="store.month" @update:model-value="store.load($event)" />
       <RouterLink
         to="/transactions/new"
@@ -51,9 +56,19 @@ watch(() => scope.current, () => store.load());
     </template>
 
     <!-- 手機期間切換放在內頁 -->
-    <div class="md:hidden">
+    <div class="md:hidden flex items-center gap-2.5">
       <SegmentedControl :options="periodOptions" :model-value="store.month" @update:model-value="store.load($event)" />
+      <span v-if="store.loading" class="inline-flex items-center gap-1.5 text-[12px] text-fg-3" role="status">
+        <LoadingSpinner :size="14" />載入中
+      </span>
     </div>
+
+    <!-- 等新月份資料時，舊數字淡掉並暫停操作，避免誤以為是新月份的數字 -->
+    <div
+      class="flex flex-col gap-3.5 md:gap-4 transition-opacity duration-150"
+      :class="store.loading && 'opacity-40 pointer-events-none'"
+      :aria-busy="store.loading"
+    >
 
     <div class="grid gap-3.5 md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] md:gap-4">
       <AppCard>
@@ -132,6 +147,7 @@ watch(() => scope.current, () => store.load());
         查看完整歷史 →
       </RouterLink>
     </AppCard>
+    </div>
 
     <template #fab>
       <RouterLink to="/transactions/new"><FloatingActionButton label="記一筆" /></RouterLink>
