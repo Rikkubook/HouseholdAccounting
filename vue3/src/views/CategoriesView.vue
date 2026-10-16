@@ -41,6 +41,8 @@ interface SubForm {
   parentId: number;
   parentName: string;
   subId?: number;
+  /** 編輯時帶入，窄螢幕在視窗裡停用／重新啟用 */
+  isActive?: boolean;
   name: string;
 }
 const form = ref<MainForm | SubForm | null>(null);
@@ -48,8 +50,9 @@ const form = ref<MainForm | SubForm | null>(null);
 /** 投資只有個人帳有（家庭帳沒有投資，2026-10-15 使用者決定） */
 const filterOptions = computed(() => [
   { value: "all", label: "全部" },
-  { value: "floating", label: "浮動支出" },
-  { value: "fixed", label: "固定支出" },
+  // 個人帳有 5 個選項，手機放不下「浮動支出」「固定支出」，篩選列用短名稱
+  { value: "floating", label: "浮動" },
+  { value: "fixed", label: "固定" },
   { value: "income", label: "收入" },
   ...(scope.isPersonal ? [{ value: "investment", label: "投資" }] : []),
 ]);
@@ -104,9 +107,25 @@ function openNewSub() {
   form.value = { kind: "sub", parentId: selected.value.id, parentName: selected.value.name, name: "" };
 }
 
-function openEditSub(subId: number, name: string) {
+function openEditSub(subId: number, name: string, isActive = true) {
   if (!selected.value) return;
-  form.value = { kind: "sub", parentId: selected.value.id, parentName: selected.value.name, subId, name };
+  form.value = { kind: "sub", parentId: selected.value.id, parentName: selected.value.name, subId, name, isActive };
+}
+
+/** 窄螢幕（沒有右側子分類卡片）：直接在主分類底下新增、編輯子分類 */
+function newSubFor(c: MainCategory) {
+  selectedId.value = c.id;
+  openNewSub();
+}
+function editSubOf(c: MainCategory, s: { id: number; name: string; isActive: boolean }) {
+  selectedId.value = c.id;
+  openEditSub(s.id, s.name, s.isActive);
+}
+async function toggleSubInForm() {
+  const v = form.value;
+  if (v?.kind !== "sub" || !v.subId) return;
+  await toggleSub({ id: v.subId, isActive: v.isActive ?? true, name: v.name });
+  form.value = null;
 }
 
 async function submit() {
@@ -240,15 +259,25 @@ watch(
             </span>
           </div>
 
-          <!-- 手機：子分類以 chip 呈現 -->
-          <div v-if="c.subCategories.filter((s) => s.isActive).length" class="mt-2.5 flex flex-wrap gap-1.5 xl:hidden">
-            <span
-              v-for="s in c.subCategories.filter((x) => x.isActive)"
+          <!-- 窄螢幕沒有右側子分類卡片：子分類以 chip 呈現，點 chip 編輯、點「＋」新增 -->
+          <div v-if="!c.isSystem" class="mt-2.5 flex flex-wrap gap-1.5 xl:hidden">
+            <button
+              v-for="s in byActiveFirst(c.subCategories)"
               :key="s.id"
-              class="px-2.5 py-1.5 rounded-pill bg-canvas border text-[11.5px] text-fg-2"
+              type="button"
+              class="px-2.5 py-1.5 rounded-pill bg-canvas border text-[11.5px] text-fg-2 cursor-pointer"
+              :class="!s.isActive && 'opacity-55 line-through'"
+              @click="editSubOf(c, s)"
             >
               {{ s.name }}
-            </span>
+            </button>
+            <button
+              type="button"
+              class="inline-flex items-center gap-0.5 px-2.5 py-1.5 rounded-pill border border-dashed border-strong text-[11.5px] text-brand-600 cursor-pointer"
+              @click="newSubFor(c)"
+            >
+              <span class="material-symbols-rounded text-[14px]">add</span>新增子分類
+            </button>
           </div>
         </div>
       </AppCard>
@@ -275,7 +304,7 @@ watch(
           <span class="text-body text-fg-1 truncate">{{ s.name }}</span>
           <AppBadge v-if="!s.isActive" small>已停用</AppBadge>
           <span class="ml-auto flex gap-1">
-            <IconButton icon="edit" label="編輯" :size="32" @click="openEditSub(s.id, s.name)" />
+            <IconButton icon="edit" label="編輯" :size="32" @click="openEditSub(s.id, s.name, s.isActive)" />
             <IconButton
               :icon="s.isActive ? 'archive' : 'unarchive'"
               :label="s.isActive ? '停用' : '重新啟用'"
@@ -357,6 +386,14 @@ watch(
       <template #footer>
         <AppButton variant="primary" size="lg" full-width @click="submit">
           {{ form && (form.kind === "sub" ? form.subId : form.id) ? "儲存變更" : "新增" }}
+        </AppButton>
+        <AppButton
+          v-if="form?.kind === 'sub' && form.subId"
+          size="lg"
+          class="xl:hidden"
+          @click="toggleSubInForm"
+        >
+          {{ form.isActive ? "停用" : "重新啟用" }}
         </AppButton>
         <AppButton size="lg" @click="form = null">取消</AppButton>
       </template>

@@ -119,8 +119,13 @@ function fixedTotalOf(scope?: string): number {
     .reduce((sum, s) => sum + monthlyEquivalent(s.amount, s.cycle), 0);
 }
 
+/**
+ * 回傳前先複製一份，跟真後端一樣每次都是新的 JSON。
+ * 直接回傳假資料庫裡的物件的話，畫面拿到同一個參考，改動後 Vue 不會重畫（例如新增子分類後畫面不更新）。
+ */
 function ok<T>(data: T, config: AxiosRequestConfig): AxiosResponse<T> {
-  return { data, status: 200, statusText: "OK", headers: {}, config: config as never };
+  const copy = data === undefined ? data : (JSON.parse(JSON.stringify(data)) as T);
+  return { data: copy, status: 200, statusText: "OK", headers: {}, config: config as never };
 }
 
 function fail(code: string, message: string, status = 400, extra: Record<string, unknown> = {}) {
@@ -211,6 +216,11 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
   [/^\/categories\/subs\/(\d+)\/archive$/, "post", (m) => {
     const cat = db.categories.find((c) => c.subCategories.some((s) => s.id === Number(m[1])))!;
     cat.subCategories.find((x) => x.id === Number(m[1]))!.isActive = false;
+    return cat;
+  }],
+  [/^\/categories\/subs\/(\d+)\/restore$/, "post", (m) => {
+    const cat = db.categories.find((c) => c.subCategories.some((s) => s.id === Number(m[1])))!;
+    cat.subCategories.find((x) => x.id === Number(m[1]))!.isActive = true;
     return cat;
   }],
 
