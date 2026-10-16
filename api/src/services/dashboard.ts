@@ -92,7 +92,7 @@ export async function buildDashboard(month: string, scope: Scope = FAMILY): Prom
     month,
     income,
     expense,
-    // 結餘＝收入 − 支出（不含投資：投資沒扣）；剩餘現金＝net − investment 由前端算
+    // 結餘＝收入 − 支出（含投資，投資還沒扣）；剩餘現金＝net − investment 由前端算
     net: income - expense,
     investment,
     hasInvestment: categories.some((c) => c.type === "investment") || investment > 0,
