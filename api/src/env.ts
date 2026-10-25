@@ -13,6 +13,10 @@ const schema = z.object({
   SEED_ADMIN_PASSWORD: z.string().min(4, "SEED_ADMIN_PASSWORD 至少 4 字元").default("1234"),
   // Vercel Cron 的呼叫憑證。未設定時 /api/cron/* 一律回 403。
   CRON_SECRET: z.string().min(16).optional(),
+  // 家用 LINE 機器人：每月 10、20、30 號在家庭群組發剩餘額度。兩者缺一時只試算、不發送。
+  LINE_CHANNEL_ACCESS_TOKEN: z.string().min(1).optional(),
+  // 推播對象：家庭群組 ID（C 開頭）；測試時可先填自己的 User ID（U 開頭）
+  LINE_NOTIFY_TO: z.string().regex(/^[CUR][0-9a-f]{32}$/, "LINE_NOTIFY_TO 須為 C／U／R 開頭的 LINE ID").optional(),
   // 每週備份的上傳目標（Supabase Storage）。兩者缺一時備份端點只試算不上傳。
   SUPABASE_URL: z.string().url().optional(),
   SUPABASE_SERVICE_KEY: z.string().min(20).optional(),
