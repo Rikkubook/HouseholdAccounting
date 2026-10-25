@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { runDueCharges } from "../services/charges.js";
 import { runBackup } from "../services/backup.js";
+import { buildBudgetReminder, isReminderDay, sendLineMessage, taipeiToday } from "../services/budgetReminder.js";
 import { env } from "../env.js";
 import { today } from "../lib/dates.js";
 import type { AppEnv } from "../middleware/auth.js";
@@ -28,6 +29,22 @@ cronRoutes.get("/run-due-charges", async (c) => {
   const charged = await runDueCharges(asOf);
   console.log("[cron] run-due-charges " + asOf + " → " + charged.length + " 筆");
   return c.json({ asOf, charged });
+});
+
+/**
+ * 每月 10、20、30 號（2 月改月底）在家庭 LINE 群組發剩餘額度。
+ * 排程設在 10、20、28、29、30 號，不是發送日就跳過。
+ * 手動測試：?date=YYYY-MM-DD 指定日期、?force=1 不看日期、?dryRun=1 只回傳訊息不發送。
+ */
+cronRoutes.get("/budget-reminder", async (c) => {
+  const date = c.req.query("date") ?? taipeiToday();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return c.json({ code: "bad_request", message: "date 格式須為 YYYY-MM-DD" }, 400);
+  if (!c.req.query("force") && !isReminderDay(date)) return c.json({ date, skipped: true });
+
+  const { text, message } = await buildBudgetReminder(date);
+  const result = c.req.query("dryRun") ? { sent: false as const, reason: "dryRun" } : await sendLineMessage(message);
+  console.log("[cron] budget-reminder " + date + " → " + (result.sent ? "已發送" : "未發送：" + result.reason));
+  return c.json({ date, text, ...result });
 });
 
 /** 全庫 JSON 快照 → Supabase Storage 私有 bucket。免費方案無 PITR 的替代方案。 */

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -22,7 +22,12 @@ function postgresBinDir(): string {
   const pkgRoot = dirname(dirname(req.resolve(`@embedded-postgres/${platform}-${process.arch}`)));
   const { version } = JSON.parse(readFileSync(join(pkgRoot, "package.json"), "utf8")) as { version: string };
   const target = join(tmpdir(), "family-ledger-pg-bin", version);
-  if (!existsSync(join(target, "bin"))) {
+  // 暫存資料夾可能被 Windows 清掉一部分（DLL 不見，initdb 回 0xC0000135）：
+  // 檔案數跟套件對不上就整份重新複製，不只看資料夾在不在
+  const complete = (sub: string) =>
+    existsSync(join(target, sub)) && readdirSync(join(target, sub)).length === readdirSync(join(pkgRoot, "native", sub)).length;
+  if (!["bin", "lib", "share"].every(complete)) {
+    rmSync(target, { recursive: true, force: true });
     cpSync(join(pkgRoot, "native"), target, { recursive: true });
   }
   return join(target, "bin");

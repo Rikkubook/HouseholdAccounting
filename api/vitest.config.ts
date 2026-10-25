@@ -18,6 +18,9 @@ export default defineConfig({
       // today() 用伺服器時區；固定成台灣，快照才不會因機器時區而變
       TZ: "Asia/Taipei",
       VERCEL: "",
+      CRON_SECRET: "test-cron-secret-0000",
+      LINE_CHANNEL_ACCESS_TOKEN: "test-line-token",
+      LINE_NOTIFY_TO: "C0123456789abcdef0123456789abcdef",
     },
     // 所有測試共用同一個資料庫，不可平行跑
     fileParallelism: false,

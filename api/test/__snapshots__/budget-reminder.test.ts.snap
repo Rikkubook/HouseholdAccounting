@@ -1,0 +1,11 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`GET /cron/budget-reminder > 訊息格式：日期、標題、分類 花費 / 預計（剩 N）、空行、本月結餘 1`] = `
+"09/10 家庭帳剩餘額度  💰
+
+食 1,590 / 14,000（剩 12,410）
+住 23,450 / 28,000（剩 4,550）
+行 1,500 / 6,000（剩 4,500）
+
+本月結餘: 141,960"
+`;
