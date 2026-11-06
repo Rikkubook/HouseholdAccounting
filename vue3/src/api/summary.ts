@@ -65,8 +65,9 @@ export const summaryApi = {
   stats: (range: "month" | "year", period: string, payerId?: number | null) =>
     http.get<StatsPayload>("/summary/stats", { params: { range, period, payerId, scope: activeScope() } }).then((r) => r.data),
 
-  year: (year: number) =>
-    http.get<YearSummaryPayload>("/summary/year", { params: { year, scope: activeScope() } }).then((r) => r.data),
+  /** scope 不給就用目前的帳本；戶頭對帳頁固定查家庭帳 */
+  year: (year: number, scope: "family" | "personal" = activeScope()) =>
+    http.get<YearSummaryPayload>("/summary/year", { params: { year, scope } }).then((r) => r.data),
 
   createYearExtra: (draft: Omit<YearExtraExpense, "id">) =>
     http.post<YearExtraExpense>("/summary/year-extras", draft).then((r) => r.data),

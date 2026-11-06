@@ -11,13 +11,14 @@ export interface NavItem {
   personalOpen?: boolean;
 }
 
-/** 側欄順序：全員五項，之後為 ADMIN 四項。一般成員看不到 ADMIN 區。 */
+/** 側欄順序：全員六項，之後為 ADMIN 四項。一般成員看不到 ADMIN 區。 */
 export const NAV_ITEMS: NavItem[] = [
   { name: "dashboard", label: "首頁儀表板", to: "/" },
   { name: "transaction-create", label: "新增交易", to: "/transactions/new" },
   { name: "transactions", label: "交易列表", to: "/transactions" },
   { name: "stats", label: "統計圖表", to: "/stats" },
   { name: "year-summary", label: "年度彙整", to: "/year" },
+  { name: "reconcile", label: "戶頭對帳", to: "/reconcile", familyOnly: true },
   { name: "budget", label: "預算管理", to: "/budget", adminDivider: true, adminOnly: true, personalOpen: true },
   { name: "subscriptions", label: "訂閱管理", to: "/subscriptions", adminOnly: true, personalOpen: true },
   { name: "members", label: "成員管理", to: "/members", adminOnly: true, familyOnly: true },

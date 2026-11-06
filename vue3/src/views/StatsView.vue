@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { onMounted, ref, watch } from "vue";
 import AppShell from "@/components/layout/AppShell.vue";
 import AppCard from "@/components/base/AppCard.vue";
 import ProgressBar from "@/components/base/ProgressBar.vue";
-import { summaryApi, type StatsPayload } from "@/api/summary";
+import ExpenseShareCard from "@/components/data/ExpenseShareCard.vue";
+import type { StatsPayload } from "@/api/summary";
 import { useAuthStore } from "@/stores/auth";
 import { useMembersStore } from "@/stores/members";
 import { useScopeStore } from "@/stores/scope";
 import { currentMonth, money, percent } from "@/utils/format";
+import { loadMonthShares } from "@/utils/memberShares";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const auth = useAuthStore();
@@ -24,61 +26,14 @@ const loading = ref(false);
 const initialLoading = ref(true);
 const error = ref<LoadErrorKind | null>(null);
 
-/** 成員色沿用成員管理裡自選的頭像色；「其他」用灰色。 */
-const OTHER_COLOR = "var(--dot-idle)";
-
-/** 當月各成員支出佔比；不屬於任何啟用成員的支出（如「系統」匯入）併成「其他」排最後。 */
-const shares = computed(() => {
-  if (!data.value) return [];
-  const list = members.active
-    .map((m, i) => ({
-      key: "m" + m.id,
-      name: m.name,
-      amount: memberTotals.value[i] ?? 0,
-      color: m.color,
-    }))
-    .filter((s) => s.amount > 0);
-  const other = data.value.total - list.reduce((sum, s) => sum + s.amount, 0);
-  if (other > 0) list.push({ key: "other", name: "其他", amount: other, color: OTHER_COLOR });
-  return list;
-});
-
-/** 標籤放在各線段中點正下方；太靠兩端時改貼齊左右邊，避免超出卡片。 */
-const shareLabels = computed(() => {
-  const total = shares.value.reduce((sum, s) => sum + s.amount, 0);
-  let start = 0;
-  return shares.value.map((s) => {
-    const width = (s.amount / total) * 100;
-    const center = start + width / 2;
-    start += width;
-    const style =
-      center < 15
-        ? { left: "0" }
-        : center > 85
-          ? { right: "0" }
-          : { left: center + "%", transform: "translateX(-50%)" };
-    return { ...s, style };
-  });
-});
-
 async function load() {
   loading.value = true;
   error.value = null;
   openCategoryId.value = null; // 切換月份時退回主分類層
   try {
-    if (scope.isPersonal) {
-      // 個人帳只有自己的支出，不必逐一查各成員
-      const all = await summaryApi.stats("month", month.value);
-      data.value = all;
-      memberTotals.value = members.active.map((m) => (m.id === auth.user?.id ? all.total : 0));
-    } else {
-      const [all, ...perMember] = await Promise.all([
-        summaryApi.stats("month", month.value),
-        ...members.active.map((m) => summaryApi.stats("month", month.value, m.id)),
-      ]);
-      data.value = all;
-      memberTotals.value = perMember.map((p) => p.total);
-    }
+    const res = await loadMonthShares(month.value, members.active, scope.isPersonal ? auth.user?.id ?? null : null);
+    data.value = res.stats;
+    memberTotals.value = res.memberTotals;
   } catch (e) {
     error.value = toLoadErrorKind(e);
   } finally {
@@ -105,49 +60,7 @@ onMounted(async () => {
     :error="error"
     @retry="load"
   >
-    <AppCard>
-      <div class="flex items-center gap-3 flex-wrap">
-        <div>
-          <div class="text-section font-bold text-fg-1">當月支出比例</div>
-          <div class="text-[11.5px] text-fg-3 mt-0.5">各成員佔當月總支出（含固定支出）</div>
-        </div>
-        <input
-          v-model="month"
-          type="month"
-          :max="currentMonth()"
-          class="ml-auto h-[38px] px-3 rounded-md border border-strong bg-surface text-[13px] text-fg-1 outline-none box-border"
-        />
-      </div>
-
-      <div class="mt-4 flex items-baseline gap-2">
-        <span class="text-metric-sm font-bold text-fg-1 tnum">{{ money(data?.total ?? 0) }}</span>
-        <span class="text-[12px] text-fg-3">當月總支出</span>
-      </div>
-
-      <div class="mt-3 flex h-2 gap-[2px] rounded-pill bg-track overflow-hidden">
-        <div
-          v-for="s in shares"
-          :key="s.key"
-          class="h-full min-w-[3px] transition-[flex-grow] duration-500 ease-out"
-          :style="{ flexGrow: s.amount, flexBasis: 0, background: s.color }"
-          :title="`${s.name} ${money(s.amount)}（${percent(s.amount, data?.total ?? 0)}）`"
-        />
-      </div>
-
-      <ul v-if="shares.length" class="relative mt-2 h-5">
-        <li
-          v-for="s in shareLabels"
-          :key="s.key"
-          class="absolute top-0 flex items-baseline gap-1.5 whitespace-nowrap text-[12px]"
-          :style="s.style"
-        >
-          <span class="text-fg-2">{{ s.name }}</span>
-          <span class="text-fg-1 tnum">{{ money(s.amount) }}</span>
-          <span class="font-mono text-[11px] text-fg-3 tnum">{{ percent(s.amount, data?.total ?? 0) }}</span>
-        </li>
-      </ul>
-      <div v-else class="mt-3 text-[12px] text-fg-3">這個月還沒有支出</div>
-    </AppCard>
+    <ExpenseShareCard v-model:month="month" :total="data?.total ?? 0" :member-totals="memberTotals" />
 
     <AppCard pad="none">
       <div class="px-4 py-3.5 border-b md:px-5">
