@@ -497,23 +497,37 @@ onMounted(async () => {
         <div class="text-section font-bold text-fg-1">年度額外開銷明細</div>
         <div class="text-[11.5px] text-fg-3 mt-0.5">不列入單月，計入分類年度總計</div>
       </div>
-      <div
-        v-for="e in data.extras"
-        :key="e.id"
-        class="grid items-center gap-3 px-4 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px] md:px-5"
-        :style="{ gridTemplateColumns: 'minmax(0,1fr) 96px 76px 120px 72px' }"
-      >
-        <span class="text-fg-1 truncate">{{ e.name }}</span>
-        <span class="text-fg-3">{{ e.categoryName }}</span>
-        <span class="text-fg-3">{{ e.payerName }}</span>
-        <span class="text-right text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
-        <span class="flex justify-end gap-0.5">
-          <template v-if="canEditExtras">
-            <IconButton icon="edit" label="編輯" :size="32" @click="openEdit(e)" />
-            <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e)" />
-          </template>
-        </span>
-      </div>
+      <template v-for="e in data.extras" :key="e.id">
+        <!-- 桌機：5 欄表格 -->
+        <div
+          class="hidden md:grid items-center gap-3 px-5 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px]"
+          :style="{ gridTemplateColumns: 'minmax(0,1fr) 96px 76px 120px 72px' }"
+        >
+          <span class="text-fg-1 truncate">{{ e.name }}</span>
+          <span class="text-fg-3">{{ e.categoryName }}</span>
+          <span class="text-fg-3">{{ e.payerName }}</span>
+          <span class="text-right text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
+          <span class="flex justify-end gap-0.5">
+            <template v-if="canEditExtras">
+              <IconButton icon="edit" label="編輯" :size="32" @click="openEdit(e)" />
+              <IconButton icon="delete" label="刪除" variant="danger" :size="32" @click="removeExtra(e)" />
+            </template>
+          </span>
+        </div>
+
+        <!-- 手機：兩行排版。固定欄寬加總約 444px，放不進手機卡片，會把整頁撐出橫向捲動 -->
+        <div class="md:hidden flex items-center gap-2.5 px-4 py-3 border-b border-[rgba(0,0,0,.04)]">
+          <span class="flex flex-col gap-0.5 min-w-0 flex-1">
+            <span class="text-body text-fg-1 truncate">{{ e.name }}</span>
+            <span class="text-[10.5px] text-fg-4 truncate">{{ e.categoryName }} · {{ e.payerName }}</span>
+          </span>
+          <span class="shrink-0 text-body text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
+          <span v-if="canEditExtras" class="shrink-0 flex gap-0.5">
+            <IconButton icon="edit" label="編輯" :size="40" @click="openEdit(e)" />
+            <IconButton icon="delete" label="刪除" variant="danger" :size="40" @click="removeExtra(e)" />
+          </span>
+        </div>
+      </template>
     </AppCard>
 
     <AppDialog
