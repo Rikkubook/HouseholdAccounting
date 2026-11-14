@@ -516,8 +516,19 @@ const routes: [RegExp, string, (m: RegExpMatchArray, body: any, params: any) => 
       };
     };
     const floatingRows = floating.map(build).filter((r) => r.amount > 0);
+    // 與後端一致：年度額外開銷依付款日期歸月（未填日期當作該年 1/1），未來日期不算
+    const scopedIds = new Set(scopedCategories(q.scope).map((c) => c.id));
+    const today = new Date().toISOString().slice(0, 10);
+    const extras = db.yearExtras
+      .map((e) => ({ e, on: e.paidOn ?? e.year + "-01-01" }))
+      .filter(({ e, on }) => scopedIds.has(e.mainCategoryId) && on.startsWith(period) && on <= today)
+      .filter(({ e }) => !q.payerId || e.payerId === Number(q.payerId))
+      .map(({ e }) => ({
+        id: e.id, name: e.name, amount: e.amount, payerId: e.payerId, paidOn: e.paidOn,
+        categoryName: db.categories.find((c) => c.id === e.mainCategoryId)?.name ?? "—",
+      }));
     return {
-      range, period, floating: floatingRows,
+      range, period, floating: floatingRows, extras,
       fixed: fixed.map((c) => ({
         name: c.name,
         amount: rows.filter((t) => t.mainCategoryId === c.id).reduce((s, t) => s + t.amount, 0),

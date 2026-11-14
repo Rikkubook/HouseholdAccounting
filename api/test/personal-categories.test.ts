@@ -119,7 +119,7 @@ describe("個人年度額外開銷", () => {
   let sisFun: MainCategory;
   let extraId: number;
   const post = (body: Record<string, unknown>, as: "dad" | "sis" = "sis") =>
-    api<{ id: number }>("/summary/year-extras", { method: "POST", as, body: { year: 2026, name: "旅遊", amount: 6995, ...body } });
+    api<{ id: number }>("/summary/year-extras", { method: "POST", as, body: { year: 2026, name: "旅遊", amount: 6995, paidOn: "2026-08-20", ...body } });
 
   beforeAll(async () => {
     sisFun = (await create({ name: "樂", type: "expense", nature: "floating" }, "sis")).body;
@@ -173,7 +173,7 @@ describe("個人年度額外開銷", () => {
   it("家庭帳的年度額外開銷只有管理者能改", async () => {
     const familyExtra = await api<{ id: number }>("/summary/year-extras", {
       method: "POST",
-      body: { year: 2026, name: "家電", amount: 1000, mainCategoryId: 3, payerId: 1 },
+      body: { year: 2026, name: "家電", amount: 1000, mainCategoryId: 3, payerId: 1, paidOn: "2026-09-01" },
     });
     expect(familyExtra.status).toBe(201);
     const path = `/summary/year-extras/${familyExtra.body.id}`;

@@ -162,6 +162,8 @@ export const yearExtraExpenseSchema = z.object({
   amount: z.number().int(),
   mainCategoryId: z.number().int(),
   payerId: z.number().int(),
+  /** 付款日期 YYYY-MM-DD；舊資料為 null（畫面顯示「未填日期」，計算時當作該年 1 月） */
+  paidOn: z.string().nullable(),
 });
 
 /* ── 請求 payload ───────────────────────────────────── */
@@ -288,6 +290,8 @@ export const yearExtraDraftSchema = z.object({
   amount: amountSchema,
   mainCategoryId: z.number().int().positive(),
   payerId: z.number().int().positive(),
+  /** 付款日期，必須在該年度內；決定算進戶頭對帳與支出比例的哪個月 */
+  paidOn: dateSchema,
 });
 
 /** 年度不可改；分類只能換成同一本帳的支出分類 */

@@ -1,12 +1,13 @@
 import { and, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import type { StatsPayload, StatsRow } from "@family-ledger/shared";
 import { db } from "../db/index.js";
-import { budgets, transactions } from "../db/schema.js";
+import { budgets, mainCategories, transactions, yearExtraExpenses } from "../db/schema.js";
 import { addMonths, existsInMonth, monthRange, yearRange } from "../lib/dates.js";
 import { listCategories } from "./categories.js";
-import { budgetScope, FAMILY, txScope, type Scope } from "./scope.js";
+import { budgetScope, FAMILY, txScope, yearExtraScope, type Scope } from "./scope.js";
 import { effectiveSubscriptions } from "./fixed.js";
 import { intSum, notFuture } from "./views.js";
+import { today } from "../lib/dates.js";
 
 /** month=YYYY-MM 取單月；year=YYYY 取整年 12 個月。 */
 export async function buildStats(
@@ -32,7 +33,15 @@ export async function buildStats(
     payerId ? eq(transactions.payerId, payerId) : undefined
   );
 
-  const [rows, categories, budgetRows, ...fixedByMonth] = await Promise.all([
+  // 年度額外開銷依付款日期歸月；未填日期當作該年 1 月 1 日。未來日期不算（同一般交易）
+  const extraPaidOn = sql<string>`coalesce(${yearExtraExpenses.paidOn}, make_date(${yearExtraExpenses.year}, 1, 1))`;
+  const extrasWhere = and(
+    yearExtraScope(scope),
+    sql`${extraPaidOn} >= ${start} and ${extraPaidOn} < ${end} and ${extraPaidOn} <= ${today()}`,
+    payerId ? eq(yearExtraExpenses.payerId, payerId) : undefined
+  );
+
+  const [rows, categories, budgetRows, extraRows, ...fixedByMonth] = await Promise.all([
     db
       .select({
         mainCategoryId: transactions.mainCategoryId,
@@ -44,6 +53,19 @@ export async function buildStats(
       .groupBy(transactions.mainCategoryId, transactions.subCategoryId),
     listCategories(true, scope),
     db.select().from(budgets).where(and(inArray(budgets.month, months), budgetScope(scope))),
+    db
+      .select({
+        id: yearExtraExpenses.id,
+        name: yearExtraExpenses.name,
+        amount: yearExtraExpenses.amount,
+        payerId: yearExtraExpenses.payerId,
+        paidOn: yearExtraExpenses.paidOn,
+        categoryName: mainCategories.name,
+      })
+      .from(yearExtraExpenses)
+      .innerJoin(mainCategories, eq(mainCategories.id, yearExtraExpenses.mainCategoryId))
+      .where(extrasWhere)
+      .orderBy(extraPaidOn, yearExtraExpenses.id),
     ...months.map((m) => effectiveSubscriptions(m, scope)),
   ]);
 
@@ -104,7 +126,7 @@ export async function buildStats(
   const total =
     floating.reduce((sum, r) => sum + r.amount, 0) + fixed.reduce((sum, r) => sum + r.amount, 0);
 
-  return { range, period, floating, fixed, total };
+  return { range, period, floating, fixed, total, extras: extraRows };
 }
 
 /** 統計頁的月份下拉需要「有資料的最早月份」。 */

@@ -55,7 +55,10 @@ function assertCanWriteExtra(user: AuthUser, cat: { ownerId: number | null } | u
   return "ok" as const;
 }
 
-/** 年度額外支出：不分攤到個別月份，僅在年度彙整頁計入。 */
+/**
+ * 年度額外支出：不列入單月分類統計，在年度彙整計入分類年度總計；
+ * 付款日期決定算進戶頭對帳與支出比例的哪個月。
+ */
 summaryRoutes.post("/year-extras", zValidator("json", yearExtraDraftSchema), async (c) => {
   const draft = c.req.valid("json");
   const user = c.get("user");
@@ -69,6 +72,7 @@ summaryRoutes.post("/year-extras", zValidator("json", yearExtraDraftSchema), asy
 
   const [payer] = await db.select().from(members).where(eq(members.id, draft.payerId)).limit(1);
   if (!payer) throw badRequest("支付者不存在");
+  if (Number(draft.paidOn.slice(0, 4)) !== draft.year) throw badRequest("付款日期須在 " + draft.year + " 年內");
 
   const [row] = await db.insert(yearExtraExpenses).values(draft).returning();
   return c.json<YearExtraExpense>(row!, 201);
@@ -98,6 +102,9 @@ summaryRoutes.patch(
       if (!next || next.ownerId !== cat!.ownerId || next.type !== "expense") {
         throw badRequest("只能改成同一本帳的支出分類");
       }
+    }
+    if (patch.paidOn !== undefined && Number(patch.paidOn.slice(0, 4)) !== extra.year) {
+      throw badRequest("付款日期須在 " + extra.year + " 年內");
     }
     if (patch.payerId !== undefined && patch.payerId !== extra.payerId) {
       if (cat!.ownerId != null) throw badRequest("個人帳的額外開銷支付者只能是自己");

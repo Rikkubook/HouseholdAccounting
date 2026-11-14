@@ -24,7 +24,10 @@ export interface StatsPayload {
   period: string;
   floating: StatsRow[];
   fixed: { name: string; amount: number }[];
+  /** 不含年度額外開銷 */
   total: number;
+  /** 付款日期落在這段期間的年度額外開銷（未填日期當作該年 1 月 1 日） */
+  extras: { id: number; name: string; amount: number; payerId: number; paidOn: string | null; categoryName: string }[];
 }
 
 export interface YearCategoryRow {

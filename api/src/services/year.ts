@@ -58,6 +58,7 @@ export async function buildYearSummary(year: number, scope: Scope = FAMILY): Pro
             amount: yearExtraExpenses.amount,
             mainCategoryId: yearExtraExpenses.mainCategoryId,
             payerId: yearExtraExpenses.payerId,
+            paidOn: yearExtraExpenses.paidOn,
             categoryName: mainCategories.name,
             payerName: members.name,
           })

@@ -9,7 +9,7 @@ import { useAuthStore } from "@/stores/auth";
 import { useMembersStore } from "@/stores/members";
 import { useScopeStore } from "@/stores/scope";
 import { currentMonth, money, percent } from "@/utils/format";
-import { loadMonthShares } from "@/utils/memberShares";
+import { loadMonthShares, type ShareExtra } from "@/utils/memberShares";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const auth = useAuthStore();
@@ -20,6 +20,9 @@ const month = ref(currentMonth());
 const data = ref<StatsPayload | null>(null);
 /** 各成員當月支出（含其負責的固定支出），順序同 members.active。 */
 const memberTotals = ref<number[]>([]);
+/** 支出比例卡片：含年度額外開銷的當月總支出與明細（分類統計本身不含） */
+const shareTotal = ref(0);
+const shareExtras = ref<ShareExtra[]>([]);
 const openCategoryId = ref<number | null>(null);
 const loading = ref(false);
 /** 只在第一次載入完成前為 true；切換月份重新查詢時維持 false。 */
@@ -34,6 +37,8 @@ async function load() {
     const res = await loadMonthShares(month.value, members.active, scope.isPersonal ? auth.user?.id ?? null : null);
     data.value = res.stats;
     memberTotals.value = res.memberTotals;
+    shareTotal.value = res.shareTotal;
+    shareExtras.value = res.extras;
   } catch (e) {
     error.value = toLoadErrorKind(e);
   } finally {
@@ -60,7 +65,7 @@ onMounted(async () => {
     :error="error"
     @retry="load"
   >
-    <ExpenseShareCard v-model:month="month" :total="data?.total ?? 0" :member-totals="memberTotals" />
+    <ExpenseShareCard v-model:month="month" :total="shareTotal" :member-totals="memberTotals" :extras="shareExtras" />
 
     <AppCard pad="none">
       <div class="px-4 py-3.5 border-b md:px-5">

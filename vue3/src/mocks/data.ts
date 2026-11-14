@@ -117,8 +117,9 @@ export const subscriptions: Subscription[] = (
 }));
 
 export const yearExtras: YearExtraExpense[] = [
-  { id: 1, year: 2026, name: "健檢", amount: 9900, mainCategoryId: 5, payerId: SYSTEM_ID },
-  { id: 4, year: 2025, name: "沙發與床墊", amount: 62000, mainCategoryId: 3, payerId: 1 },
+  { id: 1, year: 2026, name: "健檢", amount: 9900, mainCategoryId: 5, payerId: SYSTEM_ID, paidOn: null },
+  { id: 2, year: 2026, name: "汽車保養", amount: 12000, mainCategoryId: 4, payerId: 1, paidOn: "2026-10-05" },
+  { id: 4, year: 2025, name: "沙發與床墊", amount: 62000, mainCategoryId: 3, payerId: 1, paidOn: "2025-06-15" },
 ];
 
 export const revisions: TransactionRevision[] = [];
@@ -237,7 +238,7 @@ PERSONAL_EXTRAS.forEach(([cat, amount], i) => {
   const mainCategoryId = categories.find(
     (c) => c.name === cat && (c as MainCategory & { ownerId?: number }).ownerId === PERSONAL_OWNER
   )!.id;
-  yearExtras.push({ id: 201 + i, year: 2026, name: cat + "額外開銷（系統匯入）", amount, mainCategoryId, payerId: PERSONAL_OWNER });
+  yearExtras.push({ id: 201 + i, year: 2026, name: cat + "額外開銷（系統匯入）", amount, mainCategoryId, payerId: PERSONAL_OWNER, paidOn: null });
 });
 
 const PERSONAL_LINES: { label: string; cat: string; sub?: string; amounts: number[] }[] = [

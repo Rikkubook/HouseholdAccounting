@@ -714,6 +714,32 @@ exports[`GET /summary/dashboard > 本月（9 月） 1`] = `
 
 exports[`GET /summary/stats > 年統計 · 全家 1`] = `
 {
+  "extras": [
+    {
+      "amount": 86000,
+      "categoryName": "育樂",
+      "id": 1,
+      "name": "日本家庭旅遊",
+      "paidOn": null,
+      "payerId": 2,
+    },
+    {
+      "amount": 48000,
+      "categoryName": "住",
+      "id": 2,
+      "name": "冷氣與冰箱更新",
+      "paidOn": null,
+      "payerId": 1,
+    },
+    {
+      "amount": 32000,
+      "categoryName": "行",
+      "id": 3,
+      "name": "汽車大保養",
+      "paidOn": null,
+      "payerId": 1,
+    },
+  ],
   "fixed": [
     {
       "amount": 12000,
@@ -858,6 +884,7 @@ exports[`GET /summary/stats > 年統計 · 全家 1`] = `
 
 exports[`GET /summary/stats > 月統計 · 全家 1`] = `
 {
+  "extras": [],
   "fixed": [
     {
       "amount": 1000,
@@ -942,6 +969,7 @@ exports[`GET /summary/stats > 月統計 · 全家 1`] = `
 
 exports[`GET /summary/stats > 月統計 · 只看先生 1`] = `
 {
+  "extras": [],
   "fixed": [
     {
       "amount": 390,
@@ -1021,6 +1049,7 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
       "id": 1,
       "mainCategoryId": 6,
       "name": "日本家庭旅遊",
+      "paidOn": null,
       "payerId": 2,
       "payerName": "太太",
       "year": 2026,
@@ -1031,6 +1060,7 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
       "id": 2,
       "mainCategoryId": 3,
       "name": "冷氣與冰箱更新",
+      "paidOn": null,
       "payerId": 1,
       "payerName": "先生",
       "year": 2026,
@@ -1041,6 +1071,7 @@ exports[`GET /summary/year > 2026 年度彙整 1`] = `
       "id": 3,
       "mainCategoryId": 4,
       "name": "汽車大保養",
+      "paidOn": null,
       "payerId": 1,
       "payerName": "先生",
       "year": 2026,

@@ -136,6 +136,8 @@ export const yearExtraExpenses = pgTable("year_extra_expenses", {
   amount: integer("amount").notNull(),
   mainCategoryId: integer("main_category_id").notNull(),
   payerId: integer("payer_id").notNull(),
+  /** 付款日期（sql/0006）；舊資料為 null，計算時當作該年 1 月 1 日 */
+  paidOn: date("paid_on"),
 });
 
 export type MemberRow = typeof members.$inferSelect;

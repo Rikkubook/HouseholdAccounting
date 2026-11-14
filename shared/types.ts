@@ -94,7 +94,19 @@ export interface StatsPayload {
   period: string;
   floating: StatsRow[];
   fixed: { name: string; amount: number }[];
+  /** 不含年度額外開銷（年度額外開銷不列入單月分類統計） */
   total: number;
+  /** 付款日期落在這段期間的年度額外開銷（未填日期當作該年 1 月 1 日）；支出比例卡片另外加總、標示 */
+  extras: StatsExtra[];
+}
+
+export interface StatsExtra {
+  id: number;
+  name: string;
+  amount: number;
+  payerId: number;
+  paidOn: string | null;
+  categoryName: string;
 }
 
 export interface YearCategoryRow {

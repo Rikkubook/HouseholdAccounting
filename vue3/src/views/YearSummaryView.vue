@@ -20,7 +20,7 @@ import { useCategoriesStore } from "@/stores/categories";
 import { normalizeError } from "@/api/client";
 import { useMembersStore } from "@/stores/members";
 import { useUiStore } from "@/stores/ui";
-import { money } from "@/utils/format";
+import { money, shortDate, todayISO } from "@/utils/format";
 import { toLoadErrorKind, type LoadErrorKind } from "@/utils/loadError";
 
 const cats = useCategoriesStore();
@@ -43,8 +43,12 @@ interface ExtraForm {
   amount: string;
   mainCategoryId: number;
   payerId: number;
+  /** 付款日期；必須在這個年度內，決定算進戶頭對帳與支出比例的哪個月 */
+  paidOn: string;
 }
 const form = ref<ExtraForm | null>(null);
+/** 新增時的預設付款日期：今年用今天；看往年時用該年 12/31，避免預設落在別的年度 */
+const defaultPaidOn = () => (year.value === thisYear ? todayISO() : year.value + "-12-31");
 
 const yearOptions = computed(() => [thisYear, thisYear - 1, thisYear - 2]);
 /** 啟用中的支出分類；編輯時原本的分類若已停用也保留在選單裡 */
@@ -173,6 +177,7 @@ function openNew() {
     mainCategoryId: categoryOptions.value[0]?.id ?? 1,
     // 個人帳的支付者固定是本人
     payerId: (scope.isPersonal ? auth.user?.id : members.active[0]?.id) ?? 1,
+    paidOn: defaultPaidOn(),
   };
 }
 
@@ -181,7 +186,14 @@ async function submitExtra() {
   if (!v) return;
   if (!v.name.trim()) return ui.flash("請填寫項目名稱", "danger");
   if (!v.amount || Number(v.amount) <= 0) return ui.flash("請填寫金額", "danger");
-  const fields = { name: v.name.trim(), amount: Number(v.amount), mainCategoryId: v.mainCategoryId, payerId: v.payerId };
+  if (!v.paidOn || Number(v.paidOn.slice(0, 4)) !== year.value) return ui.flash("付款日期須在 " + year.value + " 年內", "danger");
+  const fields = {
+    name: v.name.trim(),
+    amount: Number(v.amount),
+    mainCategoryId: v.mainCategoryId,
+    payerId: v.payerId,
+    paidOn: v.paidOn,
+  };
   try {
     if (v.id) await summaryApi.updateYearExtra(v.id, fields);
     else await summaryApi.createYearExtra({ year: year.value, ...fields });
@@ -200,6 +212,8 @@ function openEdit(extra: YearSummaryPayload["extras"][number]) {
     amount: String(extra.amount),
     mainCategoryId: extra.mainCategoryId,
     payerId: extra.payerId,
+    // 舊資料沒填日期：先帶入預設值，存檔時一併補上
+    paidOn: extra.paidOn ?? defaultPaidOn(),
   };
 }
 
@@ -229,8 +243,7 @@ const scope = useScopeStore();
 /**
  * 年度額外開銷跟著分類屬於哪本帳：家庭帳限管理者，個人帳本人就能新增、刪除（個人帳第 2 批）。
  */
-const canEditExtras = computed(() => scope.isPersonal || auth.isAdmin);
-watch(year, load);
+const canEditExtras = computed(() => scope.isPersonal || auth.isAdmin);watch(year, load);
 // 換帳本：分類選單也換成那本帳的
 watch(
   () => scope.current,
@@ -496,13 +509,18 @@ onMounted(async () => {
       <div class="px-4 py-3.5 border-b md:px-5">
         <div class="text-section font-bold text-fg-1">年度額外開銷明細</div>
         <div class="text-[11.5px] text-fg-3 mt-0.5">不列入單月，計入分類年度總計</div>
-      </div>
+        <div class="text-[11.5px] text-fg-3 mt-0.5">
+          依付款日期算進戶頭對帳與支出比例；未填日期的當作 1 月付款，戶頭對帳從 2 月月初起扣
+        </div>      </div>
       <template v-for="e in data.extras" :key="e.id">
         <!-- 桌機：5 欄表格 -->
         <div
           class="hidden md:grid items-center gap-3 px-5 py-3 border-b border-[rgba(0,0,0,.04)] text-[12.5px]"
-          :style="{ gridTemplateColumns: 'minmax(0,1fr) 96px 76px 120px 72px' }"
+          :style="{ gridTemplateColumns: '64px minmax(0,1fr) 96px 76px 120px 72px' }"
         >
+          <span class="font-mono text-[11.5px]" :class="e.paidOn ? 'text-fg-4' : 'text-warning'">
+            {{ e.paidOn ? shortDate(e.paidOn) : "未填日期" }}
+          </span>
           <span class="text-fg-1 truncate">{{ e.name }}</span>
           <span class="text-fg-3">{{ e.categoryName }}</span>
           <span class="text-fg-3">{{ e.payerName }}</span>
@@ -519,7 +537,10 @@ onMounted(async () => {
         <div class="md:hidden flex items-center gap-2.5 px-4 py-3 border-b border-[rgba(0,0,0,.04)]">
           <span class="flex flex-col gap-0.5 min-w-0 flex-1">
             <span class="text-body text-fg-1 truncate">{{ e.name }}</span>
-            <span class="text-[10.5px] text-fg-4 truncate">{{ e.categoryName }} · {{ e.payerName }}</span>
+            <span class="text-[10.5px] text-fg-4 truncate">
+              <span :class="e.paidOn ? '' : 'text-warning'">{{ e.paidOn ? shortDate(e.paidOn) : "未填日期" }}</span>
+              · {{ e.categoryName }} · {{ e.payerName }}
+            </span>
           </span>
           <span class="shrink-0 text-body text-fg-1 font-medium tnum">{{ money(e.amount) }}</span>
           <span v-if="canEditExtras" class="shrink-0 flex gap-0.5">
@@ -539,6 +560,15 @@ onMounted(async () => {
       <template v-if="form">
         <FormField label="項目名稱"><TextInput v-model="form.name" placeholder="例如 日本家庭旅遊" /></FormField>
         <FormField label="金額"><AmountInput v-model="form.amount" /></FormField>
+        <FormField label="付款日期" hint="算進這個月的戶頭對帳與支出比例；不列入單月分類統計">
+          <input
+            v-model="form.paidOn"
+            type="date"
+            :min="year + '-01-01'"
+            :max="year + '-12-31'"
+            class="h-[46px] px-3 rounded-lg border border-strong bg-surface text-[14px] text-fg-1 outline-none box-border w-full"
+          />
+        </FormField>
         <div v-if="!scope.isPersonal" class="flex flex-col gap-[7px]">
           <span class="text-label text-fg-3">記帳者</span>
           <SegmentedControl

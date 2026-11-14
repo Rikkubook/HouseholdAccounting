@@ -145,6 +145,8 @@ export interface YearExtraExpense {
   amount: number;
   mainCategoryId: number;
   payerId: number;
+  /** 付款日期 YYYY-MM-DD；舊資料為 null（畫面顯示「未填日期」，計算時當作該年 1 月） */
+  paidOn: string | null;
 }
 
 export interface MonthSummary {
