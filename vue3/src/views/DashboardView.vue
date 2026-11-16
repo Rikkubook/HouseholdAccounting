@@ -77,16 +77,25 @@ watch(() => scope.current, () => store.load());
           <div class="md:pl-5 md:border-l"><MetricStat label="總支出" :value="summary?.expense ?? null" size="md" /></div>
           <div class="col-span-2 md:col-span-1 md:pl-5 md:border-l">
             <MetricStat
-              :label="summary?.hasInvestment ? '淨結餘（含投資）' : '淨結餘'"
+              :label="summary?.hasInvestment && scope.isPersonal ? '淨結餘（含投資）' : '淨結餘'"
               :value="summary?.net ?? null"
               size="md"
             />
           </div>
         </div>
-        <!-- 投資不算支出（個人帳規格 6.3）：另列投資，剩餘現金＝淨結餘 − 投資 -->
+        <!--
+          投資不算支出（個人帳規格 6.3）：另列投資。
+          個人帳每月從收入撥錢去投資，剩餘現金＝淨結餘 − 投資；
+          家庭帳的投資是從戶頭累積的共用餘額撥出，不扣本月，淨結餘就是本月真正剩下的（2026-11-16 使用者決定）。
+        -->
         <div v-if="summary?.hasInvestment" class="mt-5 pt-5 border-t grid grid-cols-2 gap-5 md:grid-cols-3">
-          <MetricStat label="投資" :value="summary.investment" size="md" hint="不算支出" />
-          <div class="md:pl-5 md:border-l">
+          <MetricStat
+            label="投資"
+            :value="summary.investment"
+            size="md"
+            :hint="scope.isPersonal ? '不算支出' : '從共用餘額撥出，不扣本月結餘'"
+          />
+          <div v-if="scope.isPersonal" class="md:pl-5 md:border-l">
             <MetricStat label="剩餘現金" :value="summary.net - summary.investment" size="md" hint="淨結餘 − 投資" />
           </div>
         </div>
