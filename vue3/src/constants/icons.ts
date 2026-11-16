@@ -13,6 +13,12 @@ export const CURATED_ICONS = [
   "school",
   "pets",
   "flight",
+  // 個人帳匯入（v2.1.0）帶進來的圖示：交通費、共同費、孝親費、電話費、投資
+  "commute",
+  "group",
+  "volunteer_activism",
+  "smartphone",
+  "trending_up",
   "category",
 ];
 
