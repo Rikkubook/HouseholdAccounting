@@ -649,4 +649,7 @@ const mockAdapter: AxiosAdapter = async (config) => {
 export function installMocks() {
   http.defaults.adapter = mockAdapter;
   if (!localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, "mock-token-1");
+  // 重新整理後沿用登入時的身分（token 為 mock-token-<成員 id>），不要每次都變回 #1
+  const id = Number(localStorage.getItem(TOKEN_KEY)?.replace("mock-token-", ""));
+  if (db.members.some((m) => m.id === id)) currentUserId = id;
 }

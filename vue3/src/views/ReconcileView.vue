@@ -119,6 +119,10 @@ onMounted(async () => {
             <dd class="text-right font-mono tnum" :class="focus.priorNet < 0 ? 'text-danger' : 'text-fg-2'">
               {{ money(focus.priorNet) }}
             </dd>
+            <template v-if="data?.hasInvestment">
+              <dt class="text-fg-3">− {{ focus.month === 1 ? "前月" : "1～" + (focus.month - 1) + "月" }} 投資</dt>
+              <dd class="text-right font-mono tnum text-fg-2">{{ money(focus.priorInvestment) }}</dd>
+            </template>
             <dt class="text-fg-3">
               − {{ focus.month === 1 ? "前月" : "1～" + (focus.month - 1) + "月" }} 付款的年度額外開銷
             </dt>
@@ -144,14 +148,17 @@ onMounted(async () => {
       <div class="px-5 py-4 border-b">
         <div class="text-section font-bold text-fg-1">每月月初應有</div>
         <div class="text-[11.5px] text-fg-3 mt-0.5">
-          月初應有＝前面各月月結餘 − 前面各月付款的年度額外開銷＋本月收入 · 年度額外開銷依付款日期算進那個月
+          月初應有＝前面各月月結餘{{ data?.hasInvestment ? " − 前面各月投資" : "" }} − 前面各月付款的年度額外開銷＋本月收入
+          · 年度額外開銷依付款日期算進那個月
         </div>
       </div>
       <div
         class="grid grid-cols-[56px_repeat(3,minmax(0,1fr))] items-center h-10 px-4 md:px-5 bg-surface border-b text-[11px] text-fg-4"
       >
         <span>月份</span>
-        <span class="text-right">前面月結餘合計<br class="md:hidden" />（含額外開銷）</span>
+        <span class="text-right">
+          前面月結餘合計<br class="md:hidden" />（{{ data?.hasInvestment ? "扣投資、額外開銷" : "含額外開銷" }}）
+        </span>
         <span class="text-right">本月收入</span>
         <span class="text-right text-fg-2">月初應有</span>
       </div>
@@ -164,9 +171,9 @@ onMounted(async () => {
         <span class="font-mono text-fg-2">{{ r.month }}月</span>
         <span
           class="text-right font-mono tnum"
-          :class="r.priorNet - r.priorExtras < 0 ? 'text-danger' : 'text-fg-2'"
+          :class="r.priorNet - r.priorInvestment - r.priorExtras < 0 ? 'text-danger' : 'text-fg-2'"
         >
-          {{ money(r.priorNet - r.priorExtras) }}
+          {{ money(r.priorNet - r.priorInvestment - r.priorExtras) }}
         </span>
         <span class="text-right font-mono tnum text-fg-2">{{ money(r.income) }}</span>
         <span class="text-right font-bold tnum" :class="r.expected < 0 ? 'text-danger' : 'text-fg-1'">

@@ -47,19 +47,19 @@ interface SubForm {
 }
 const form = ref<MainForm | SubForm | null>(null);
 
-/** 投資只有個人帳有（家庭帳沒有投資，2026-10-15 使用者決定） */
+/** 家庭帳、個人帳都有投資（家庭帳原本沒有，2026-11-16 因家庭戶頭買股票改為開放） */
 const filterOptions = computed(() => [
   { value: "all", label: "全部" },
-  // 個人帳有 5 個選項，手機放不下「浮動支出」「固定支出」，篩選列用短名稱
+  // 5 個選項，手機放不下「浮動支出」「固定支出」，篩選列用短名稱
   { value: "floating", label: "浮動" },
   { value: "fixed", label: "固定" },
   { value: "income", label: "收入" },
-  ...(scope.isPersonal ? [{ value: "investment", label: "投資" }] : []),
+  { value: "investment", label: "投資" },
 ]);
 const typeOptions = computed(() => [
   { value: "expense", label: "支出" },
   { value: "income", label: "收入" },
-  ...(scope.isPersonal ? [{ value: "investment", label: "投資" }] : []),
+  { value: "investment", label: "投資" },
 ]);
 
 /** 停用的分類集中排在最下面，啟用與停用兩組各自維持原本順序。 */

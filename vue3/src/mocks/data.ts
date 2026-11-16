@@ -83,6 +83,12 @@ export const categories: MainCategory[] = [
     id: 11, name: "其他", icon: "category", type: "expense", nature: "floating", sortOrder: 11,
     isActive: true, isSystem: true, systemKey: "other", activeFrom: null, archivedFrom: null, subCategories: [],
   },
+  {
+    // 家庭帳也可以有投資（2026-11-16）：預覽戶頭對帳扣投資用
+    id: 12, name: "投資", icon: "trending_up", type: "investment", nature: null, sortOrder: 12,
+    isActive: true, isSystem: false, activeFrom: null, archivedFrom: null,
+    subCategories: [sub(12, "股票", 1)],
+  },
 ];
 
 /** 當月預算。教育（id 7）刻意未設，用來呈現「設定預算」提示。 */
@@ -294,6 +300,22 @@ function seedPersonal(startId: number): Transaction[] {
 
 const familyTransactions = seedTransactions();
 export const transactions: Transaction[] = [...familyTransactions, ...seedPersonal(familyTransactions.length)];
+// 家庭帳投資範例：10/05 買股票 10,000 → 戶頭對帳 11 月月初起扣
+transactions.push({
+  id: transactions.length + 1,
+  type: "investment",
+  mainCategoryId: 12,
+  subCategoryId: categories.find((c) => c.id === 12)!.subCategories[0].id,
+  amount: 10000,
+  date: "2026-10-05",
+  payerId: 1,
+  createdBy: 1,
+  note: "買股票",
+  createdAt: "2026-10-05T09:00:00Z",
+  isDeleted: false,
+  sourceSubscriptionId: null,
+  ownerId: null,
+});
 
 export const passwords: Record<string, string> = { dad: "1234", mom: "1234", sis: "1234" };
 export const resetCodes: Record<string, string> = { mom: "980901" };

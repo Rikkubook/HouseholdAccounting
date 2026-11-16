@@ -85,7 +85,7 @@ const footer = computed(() => {
  *
  * 帳本有投資分類時再加投資合計、剩餘現金兩列（個人帳規格 6.3）：投資不算支出，
  * 月結餘＝收入 − 支出，投資還沒扣，所以標成「月結餘（含投資）」；剩餘現金＝月結餘 − 投資。
- * 年度總計的算法和家庭帳一樣，含年度額外開銷。家庭帳沒有投資，不加這兩列。
+ * 年度總計的算法和家庭帳一樣，含年度額外開銷。帳本沒有投資分類就不加這兩列（家庭帳 2026-11-16 起也可建投資分類）。
  */
 const balanceRows = computed(() => {
   const monthly = data.value?.monthly ?? [];
@@ -137,7 +137,7 @@ const balanceRows = computed(() => {
 /** 個人帳有投資時，月結餘還沒扣投資，標明「含投資」 */
 const netLabel = computed(() => (data.value?.hasInvestment ? "月結餘（含投資）" : "月結餘"));
 const yearNet = computed(() => balanceRows.value[1]!.total);
-/** 有投資時，年度彙整以剩餘現金（收入 − 支出 − 投資）為主（2026-10-16 使用者決定）；家庭帳沒有投資就等於結餘 */
+/** 有投資時，年度彙整以剩餘現金（收入 − 支出 − 投資）為主（2026-10-16 使用者決定）；沒有投資的帳本剩餘現金就等於結餘 */
 const yearCash = computed(() => yearNet.value - (data.value?.investment ?? 0));
 const monthCash = (m: { net: number; investment: number } | null) => (m === null ? null : m.net - m.investment);
 
